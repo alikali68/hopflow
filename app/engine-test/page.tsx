@@ -180,10 +180,15 @@ export default function EngineTestPage() {
     let currentId = transferId;
     let currentPrepared = preparedData;
     let currentKeeperSig = keeperSignature;
+    // Local step tracker: React state updates are async, so the catch block
+    // cannot trust activeStepIndex — errors landed on the wrong row.
+    let currentStep = startIndex;
+    let keeperFunded = transferRecord?.status === 'processing';
 
     try {
       // Step 0: Create Transfer
       if (startIndex <= 0) {
+        currentStep = 0;
         setActiveStepIndex(0);
         updateStep(0, { status: 'active', error: undefined });
 
@@ -229,9 +234,12 @@ export default function EngineTestPage() {
         });
       }
 
-      // Step 1: Prepare
-      if (startIndex <= 1) {
+      // Step 1: Prepare — ALWAYS re-prepare. The blockhash expires within
+      // ~a minute, and for a funded transfer prepare returns fresh
+      // remaining txs with keeperFundingTx null (see resume below).
+      {
         if (!currentId) throw new Error('Missing transfer ID for preparation');
+        currentStep = 1;
         setActiveStepIndex(1);
         updateStep(1, { status: 'active', error: undefined });
 
@@ -255,62 +263,111 @@ export default function EngineTestPage() {
         if (data.transfer) {
           setTransferRecord(data.transfer);
         }
+        // The API reports resume state itself: once keeper funding is
+        // confirmed on-chain, keeperFundingTx comes back null and
+        // resume.keeperAlreadyFunded is true.
+        keeperFunded =
+          (
+            data.preparedTxs as {
+              resume?: { keeperAlreadyFunded?: boolean };
+            }
+          )?.resume?.keeperAlreadyFunded === true ||
+          data.transfer?.status === 'processing';
         updateStep(1, {
           status: 'done',
           detail: `Blockhash: ${data.preparedTxs?.recentBlockhash || 'acquired'}`,
         });
       }
 
-      // Step 2: Sign + Broadcast Keeper Funding
+      // Step 2: Sign + Broadcast Keeper Funding — skipped when the API
+      // reports keeperAlreadyFunded (prepare returns keeperFundingTx null).
       if (startIndex <= 2) {
+        currentStep = 2;
         if (!currentPrepared?.preparedTxs?.keeperFundingTx) {
-          throw new Error('keeperFundingTx missing in prepared payload');
+          if (keeperFunded) {
+            setActiveStepIndex(2);
+            updateStep(2, {
+              status: 'done',
+              detail: 'Keeper funding already confirmed',
+            });
+          } else {
+            throw new Error('keeperFundingTx missing in prepared payload');
+          }
+        } else {
+          setActiveStepIndex(2);
+          updateStep(2, { status: 'active', error: undefined });
+
+          const sig = await signAndSend(
+            connection,
+            { signTransaction },
+            currentPrepared.preparedTxs.keeperFundingTx
+          );
+
+          currentKeeperSig = sig;
+          setKeeperSignature(sig);
+          updateStep(2, {
+            status: 'done',
+            detail: `Sig: ${sig.slice(0, 16)}...${sig.slice(-8)}`,
+          });
         }
-        setActiveStepIndex(2);
-        updateStep(2, { status: 'active', error: undefined });
-
-        const sig = await signAndSend(
-          connection,
-          { signTransaction },
-          currentPrepared.preparedTxs.keeperFundingTx
-        );
-
-        currentKeeperSig = sig;
-        setKeeperSignature(sig);
-        updateStep(2, {
-          status: 'done',
-          detail: `Sig: ${sig.slice(0, 16)}...${sig.slice(-8)}`,
-        });
       }
 
-      // Step 3: Confirm Keeper Funding
+      // Step 3: Confirm Keeper Funding. The API requires the
+      // routeInitSignatures / sessionInitSignatures fields on EVERY
+      // confirm-broadcast call — a keeper-only body is rejected with
+      // "routeInitSignatures: Required". Empty arrays satisfy the schema
+      // (verified live); the real signatures go in step 5.
+      // When keeper funding is already confirmed on-chain, a failed
+      // courtesy confirm must not block the remaining steps.
       if (startIndex <= 3) {
-        if (!currentId || !currentKeeperSig) {
-          throw new Error('Missing keeper funding signature or transfer ID');
-        }
+        currentStep = 3;
         setActiveStepIndex(3);
         updateStep(3, { status: 'active', error: undefined });
 
-        const res = await fetch(
-          `/api/multihopper/transfers/${encodeURIComponent(currentId)}/confirm-broadcast`,
-          {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              keeperFundingSignature: currentKeeperSig,
-            }),
+        if (!currentId || !currentKeeperSig) {
+          if (keeperFunded) {
+            updateStep(3, {
+              status: 'done',
+              detail: 'Keeper funding already confirmed on-chain',
+            });
+          } else {
+            throw new Error('Missing keeper funding signature or transfer ID');
           }
-        );
-        const data = await res.json();
-        if (!res.ok || data.error) {
-          throw new Error(
-            data.error?.message
-              ? `${data.error.code}: ${data.error.message}`
-              : `HTTP ${res.status}`
+        } else {
+          const res = await fetch(
+            `/api/multihopper/transfers/${encodeURIComponent(currentId)}/confirm-broadcast`,
+            {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                keeperFundingSignature: currentKeeperSig,
+                routeInitSignatures: [],
+                sessionInitSignatures: [],
+              }),
+            }
           );
+          const data = await res.json();
+          if (!res.ok || data.error) {
+            if (keeperFunded) {
+              updateStep(3, {
+                status: 'done',
+                detail: 'Keeper funding already confirmed on-chain',
+              });
+            } else {
+              throw new Error(
+                data.error?.message
+                  ? `${data.error.code}: ${data.error.message}`
+                  : `HTTP ${res.status}`
+              );
+            }
+          } else {
+            setTransferRecord(data);
+            updateStep(3, {
+              status: 'done',
+              detail: 'Keeper funding acknowledged',
+            });
+          }
         }
-        setTransferRecord(data);
-        updateStep(3, { status: 'done', detail: 'Keeper funding acknowledged' });
       }
 
       // Step 4: Sign + Broadcast remaining txs
@@ -319,6 +376,7 @@ export default function EngineTestPage() {
       let sessionSigs: string[] = [];
 
       if (startIndex <= 4) {
+        currentStep = 4;
         setActiveStepIndex(4);
         updateStep(4, { status: 'active', error: undefined });
 
@@ -353,9 +411,13 @@ export default function EngineTestPage() {
         });
       }
 
-      // Step 5: Confirm Broadcast -> Processing
+      // Step 5: Confirm Broadcast -> Processing. Arrays are always sent
+      // (possibly empty) — the API requires the fields to be present — and
+      // the keeper signature is included when we have it, so a transfer
+      // whose step-3 confirm failed earlier still registers it.
       if (startIndex <= 5) {
         if (!currentId) throw new Error('Missing transfer ID');
+        currentStep = 5;
         setActiveStepIndex(5);
         updateStep(5, { status: 'active', error: undefined });
 
@@ -365,9 +427,10 @@ export default function EngineTestPage() {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-              routeInitSignatures: routeSigs.length > 0 ? routeSigs : undefined,
+              keeperFundingSignature: currentKeeperSig || undefined,
+              routeInitSignatures: routeSigs,
               orchestratorInitSignature: orchSig,
-              sessionInitSignatures: sessionSigs.length > 0 ? sessionSigs : undefined,
+              sessionInitSignatures: sessionSigs,
             }),
           }
         );
@@ -389,7 +452,7 @@ export default function EngineTestPage() {
       }
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Unknown execution failure';
-      updateStep(activeStepIndex >= 0 ? activeStepIndex : startIndex, {
+      updateStep(currentStep, {
         status: 'failed',
         error: msg,
       });
