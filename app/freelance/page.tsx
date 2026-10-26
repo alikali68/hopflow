@@ -31,7 +31,7 @@ export default function FreelanceEscrowPage() {
 
   return (
     <AppShell active="Freelance Escrow">
-      <Topbar title="Freelance Escrow" />
+      <Topbar title="Freelance Escrow" newLabel="New Escrow" newHref="/freelance/create" />
 
       <div>
         <RoleTabs role={role} onChange={setRole} />

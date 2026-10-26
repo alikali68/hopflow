@@ -115,7 +115,7 @@ export interface DashboardStat {
   label: string;
   value: string;
   sub: string;
-  iconType: 'nodes' | 'pulse' | 'dollar' | 'clock' | 'lock' | 'alert';
+  iconType: 'nodes' | 'pulse' | 'dollar' | 'clock' | 'lock' | 'alert' | 'users';
 }
 
 export interface DashboardRoute {

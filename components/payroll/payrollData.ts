@@ -25,14 +25,14 @@ export const PAYROLL_STATS: DashboardStat[] = [
     label: 'ACTIVE TEAMS',
     value: '3',
     sub: '12 members total',
-    iconType: 'pulse',
+    iconType: 'users',
   },
   {
     id: 'pr-members',
     label: 'TEAM MEMBERS',
     value: '12',
     sub: 'Across 3 teams',
-    iconType: 'nodes',
+    iconType: 'users',
   },
   {
     id: 'pr-next',

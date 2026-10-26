@@ -59,7 +59,7 @@ export default function Sidebar({ active = 'Dashboard' }: { active?: string }) {
         </nav>
 
         {/* connected wallet card */}
-        <div className="mt-8 rounded-xl border border-white/5 bg-[#1B1B28]/70 p-3">
+        <div className="grad-border-soft mt-8 rounded-xl p-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <span className="flex h-6 w-6 items-center justify-center rounded-md bg-[#14F195]/20 text-[#14F195]">

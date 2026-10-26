@@ -26,7 +26,7 @@ export default function ProjectRow({
   const isOngoing = project.status === 'In Progress' || project.status === 'Awaiting Approval';
 
   return (
-    <div className="group flex gap-4 rounded-xl border border-[#262637] bg-white/[0.02] p-4 transition-colors hover:border-[#3A3A4D] hover:bg-white/[0.04]">
+    <div className="grad-border-soft group flex gap-4 rounded-xl p-4 transition-colors hover:bg-white/[0.03]">
       <span className="icon-tile flex h-[46px] w-[46px] shrink-0 items-center justify-center rounded-xl">
         <HandshakeIcon size={22} />
       </span>

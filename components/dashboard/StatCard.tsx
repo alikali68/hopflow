@@ -1,6 +1,6 @@
 import React from 'react';
 import { DashboardStat } from '../data';
-import { NodesIcon, PulseIcon, DollarCircleIcon, ClockIcon, LockIcon, AlertIcon } from '../icons';
+import { NodesIcon, PulseIcon, DollarCircleIcon, ClockIcon, LockIcon, AlertIcon, UsersIcon } from '../icons';
 
 const ICONS: Record<DashboardStat['iconType'], React.ReactNode> = {
   nodes: <NodesIcon size={18} />,
@@ -9,6 +9,7 @@ const ICONS: Record<DashboardStat['iconType'], React.ReactNode> = {
   clock: <ClockIcon size={18} />,
   lock: <LockIcon size={18} />,
   alert: <AlertIcon size={18} />,
+  users: <UsersIcon size={18} />,
 };
 
 export default function StatCard({ item }: { item: DashboardStat }) {
