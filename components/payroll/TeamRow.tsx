@@ -54,7 +54,14 @@ export default function TeamRow({ team }: TeamRowProps) {
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-baseline gap-2">
           <h4 className="font-display text-[16px] font-bold text-white">
-            {team.name}
+            {/* B6: only Core Dev Team has a dashboard yet */}
+            {team.id === 'pt-1' ? (
+              <a href="/payroll/pt-1" className="transition-colors hover:text-[#B8B8FF] hover:underline">
+                {team.name}
+              </a>
+            ) : (
+              team.name
+            )}
           </h4>
           <span className="text-[12px] text-[#9A9AB0]">
             {team.members} members · {team.wallet}
