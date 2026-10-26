@@ -13,7 +13,7 @@ import {
 const NAV = [
   { label: 'Dashboard', href: '/dashboard', icon: <DashboardGridIcon size={18} /> },
   { label: 'Freelance Escrow', href: '/freelance', icon: <HandshakeIcon size={20} variant="current" /> },
-  { label: 'Team Payroll', href: '#', icon: <UsersIcon size={20} variant="current" /> },
+  { label: 'Team Payroll', href: '/payroll', icon: <UsersIcon size={20} variant="current" /> },
   { label: 'Token Vesting', href: '#', icon: <HourglassIcon size={18} /> },
   { label: 'Route Builder', href: '#', icon: <NodesIcon size={18} variant="current" /> },
   { label: 'Route Tracking', href: '#', icon: <PulseIcon size={18} /> },
