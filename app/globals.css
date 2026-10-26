@@ -1,0 +1,75 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    background-color: #0B0B12;
+    color: #FFFFFF;
+    min-height: 100vh;
+  }
+
+  :focus-visible {
+    outline: 2px solid #14F195;
+    outline-offset: 2px;
+  }
+}
+
+@layer components {
+  .glass-panel {
+    background: linear-gradient(160deg, rgba(255,255,255,0.08) 0%, rgba(255,255,255,0.025) 42%, rgba(255,255,255,0.01) 75%), rgba(12,12,19,0.55);
+    -webkit-backdrop-filter: blur(16px) saturate(150%);
+    backdrop-filter: blur(16px) saturate(150%);
+    border-color: rgba(255,255,255,0.13);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.20), inset 0 -1px 0 rgba(0,0,0,0.4), 0 24px 50px rgba(0,0,0,0.4);
+  }
+}
+
+  .glass-strong {
+    background: linear-gradient(160deg, rgba(255,255,255,0.09) 0%, rgba(255,255,255,0.03) 45%, rgba(255,255,255,0.012) 75%), rgba(11,11,18,0.58);
+    -webkit-backdrop-filter: blur(18px) saturate(160%);
+    backdrop-filter: blur(18px) saturate(160%);
+    border-color: rgba(255,255,255,0.15);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.26), inset 0 -1px 0 rgba(0,0,0,0.4), 0 24px 50px rgba(0,0,0,0.4);
+  }
+  .icon-tile {
+    background: linear-gradient(rgba(15,15,24,0.55), rgba(15,15,24,0.55)) padding-box, linear-gradient(135deg, #9945FF, #14F195) border-box;
+    border: 1px solid transparent;
+    box-shadow: 0 0 18px rgba(153,69,255,0.22), inset 0 0 14px rgba(20,241,149,0.07);
+    -webkit-backdrop-filter: blur(8px);
+    backdrop-filter: blur(8px);
+  }
+
+  .step-circle {
+    background: linear-gradient(rgba(10,10,17,0.42), rgba(10,10,17,0.42)) padding-box, linear-gradient(135deg, rgba(153,69,255,0.22), rgba(20,241,149,0.22)) padding-box, linear-gradient(135deg, #9945FF, #14F195) border-box;
+    border: 1.5px solid transparent;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.35), 0 0 16px rgba(153,69,255,0.25);
+    -webkit-backdrop-filter: blur(6px);
+    backdrop-filter: blur(6px);
+  }
+
+  .grad-border {
+    background: linear-gradient(165deg, rgba(22,22,36,0.88) 0%, rgba(12,12,19,0.92) 55%) padding-box, linear-gradient(140deg, rgba(153,69,255,0.85), rgba(255,255,255,0.16) 38%, rgba(20,241,149,0.80)) border-box;
+    border: 1px solid transparent;
+    -webkit-backdrop-filter: blur(18px) saturate(150%);
+    backdrop-filter: blur(18px) saturate(150%);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.16), 0 0 44px rgba(120,80,255,0.12), 0 24px 50px rgba(0,0,0,0.45);
+  }
+
+  .grad-border-soft {
+    background: linear-gradient(165deg, rgba(20,20,33,0.90) 0%, rgba(13,13,21,0.94) 60%) padding-box, linear-gradient(140deg, rgba(153,69,255,0.45), rgba(255,255,255,0.08) 42%, rgba(20,241,149,0.42)) border-box;
+    border: 1px solid transparent;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.10), 0 0 22px rgba(120,80,255,0.06);
+  }
+
+  .glass-diagram {
+    background: linear-gradient(165deg, rgba(26,26,40,0.88) 0%, rgba(12,12,19,0.90) 55%) padding-box, linear-gradient(140deg, rgba(153,69,255,0.75), rgba(255,255,255,0.14) 35%, rgba(20,241,149,0.70)) border-box;
+    border: 1px solid transparent;
+    -webkit-backdrop-filter: blur(18px) saturate(140%);
+    backdrop-filter: blur(18px) saturate(140%);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.14), 0 0 42px rgba(120,80,255,0.10), 0 24px 50px rgba(0,0,0,0.45);
+  }
