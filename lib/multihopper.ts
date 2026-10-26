@@ -37,10 +37,12 @@ export interface CreateTransferInput {
 }
 
 export interface PreparedTxs {
-  routeInitTxs?: string[];
-  orchestratorInitTx?: string;
-  sessionInitTxs?: string[];
-  keeperFundingTx?: string;
+  // Tx payloads arrive either as plain base64 strings (keeperFundingTx,
+  // orchestratorInitTx) or as { base64 } objects (route/session init txs).
+  routeInitTxs?: Array<string | { base64: string }>;
+  orchestratorInitTx?: string | { base64: string };
+  sessionInitTxs?: Array<string | { base64: string }>;
+  keeperFundingTx?: string | { base64: string };
   recentBlockhash?: string;
   lastValidBlockHeight?: number;
   [key: string]: unknown;
