@@ -43,22 +43,3 @@ export async function signAndSend(
   await connection.confirmTransaction(signature, 'confirmed');
   return signature;
 }
-
-export async function signAndSendAll(
-  connection: Connection,
-  wallet: SignerWallet,
-  base64Txs: EncodedTx[],
-  expectedFeePayer: string
-): Promise<string[]> {
-  const signatures: string[] = [];
-  for (const base64Tx of base64Txs) {
-    const signature = await signAndSend(
-      connection,
-      wallet,
-      base64Tx,
-      expectedFeePayer
-    );
-    signatures.push(signature);
-  }
-  return signatures;
-}

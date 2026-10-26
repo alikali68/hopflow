@@ -15,7 +15,7 @@ import {
   LockIcon,
   PulseIcon,
 } from '@/components/icons';
-import { signAndSend, signAndSendAll } from '@/lib/signing';
+import { signAndSend } from '@/lib/signing';
 import { verifyPreparedBundle } from '@/lib/txverify';
 import {
   signAuthMessage,
@@ -30,6 +30,13 @@ const DEFAULT_HOP_1 = '9S1136Lp3anEiLMRNgqszTcCySzBWnuAxQ5RdPq4bBaa';
 const DEFAULT_HOP_2 = 'HKKi3nYPnR6eCH4J2W6odfz3bsx1RL4KiPGKsscqJJ2o';
 
 const SOLANA_ADDRESS_REGEX = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/;
+
+// A Solana blockhash lives only ~60-90s. The keeper steps + Phantom prompts
+// can eat it, so a tx can fail with "Blockhash not found" even when
+// everything else is right. That error is safe to retry with a fresh prepare:
+// the preflight simulation runs before any broadcast, so nothing went out.
+const isBlockhashError = (err: unknown) =>
+  err instanceof Error && /blockhash not found/i.test(err.message);
 
 type StepStatus = 'idle' | 'active' | 'done' | 'failed';
 
@@ -232,6 +239,34 @@ export default function EngineTestPage() {
     let currentStep = startIndex;
     let keeperFunded = transferRecord?.status === 'processing';
 
+    // Re-prepare and verify the fresh bundle (new blockhash). Used when the
+    // blockhash expired mid-flow. Updates the shared prepared state.
+    const reprepare = async (id: string | number) => {
+      const res = await fetch(
+        `/api/multihopper/transfers/${encodeURIComponent(id)}/prepare`,
+        { method: 'POST', headers }
+      );
+      const data = await res.json();
+      if (!res.ok || data.error) {
+        throw new Error(
+          data.error?.message
+            ? `${data.error.code}: ${data.error.message}`
+            : `HTTP ${res.status}`
+        );
+      }
+      const verification = verifyPreparedBundle(
+        data.preparedTxs,
+        activeWalletAddress
+      );
+      setTxVerified(
+        `${verification.txCount} txs verified — fee payer is your wallet, ${verification.instructionCount} instructions, all programs allowed`
+      );
+      currentPrepared = data;
+      setPreparedData(data);
+      if (data.transfer) setTransferRecord(data.transfer);
+      return data.preparedTxs as PreparedTxs;
+    };
+
     try {
       // Step 0: Create Transfer
       if (startIndex <= 0) {
@@ -355,19 +390,39 @@ export default function EngineTestPage() {
           setActiveStepIndex(2);
           updateStep(2, { status: 'active', error: undefined });
 
-          const sig = await signAndSend(
-            connection,
-            { signTransaction },
-            currentPrepared.preparedTxs.keeperFundingTx,
-            activeWalletAddress
-          );
-
-          currentKeeperSig = sig;
-          setKeeperSignature(sig);
-          updateStep(2, {
-            status: 'done',
-            detail: `Sig: ${sig.slice(0, 16)}...${sig.slice(-8)}`,
-          });
+          // The blockhash may have expired while the user read the Phantom
+          // prompt — re-prepare once and retry the keeper funding.
+          const signKeeper = async (tx: NonNullable<PreparedTxs['keeperFundingTx']>) => {
+            const sig = await signAndSend(
+              connection,
+              { signTransaction },
+              tx,
+              activeWalletAddress
+            );
+            currentKeeperSig = sig;
+            setKeeperSignature(sig);
+            return sig;
+          };
+          try {
+            const sig = await signKeeper(
+              currentPrepared.preparedTxs.keeperFundingTx
+            );
+            updateStep(2, {
+              status: 'done',
+              detail: `Sig: ${sig.slice(0, 16)}...${sig.slice(-8)}`,
+            });
+          } catch (err) {
+            if (!isBlockhashError(err) || !currentId) throw err;
+            const fresh = await reprepare(currentId);
+            if (!fresh.keeperFundingTx) {
+              throw new Error('keeperFundingTx missing after re-prepare');
+            }
+            const sig = await signKeeper(fresh.keeperFundingTx);
+            updateStep(2, {
+              status: 'done',
+              detail: `Sig: ${sig.slice(0, 16)}...${sig.slice(-8)} (after re-prepare)`,
+            });
+          }
         }
       }
 
@@ -439,32 +494,54 @@ export default function EngineTestPage() {
         setActiveStepIndex(4);
         updateStep(4, { status: 'active', error: undefined });
 
-        const prep = currentPrepared?.preparedTxs;
-        if (prep?.routeInitTxs && prep.routeInitTxs.length > 0) {
-          routeSigs = await signAndSendAll(
-            connection,
-            { signTransaction },
-            prep.routeInitTxs,
-            activeWalletAddress
-          );
-        }
-
-        if (prep?.orchestratorInitTx) {
-          orchSig = await signAndSend(
-            connection,
-            { signTransaction },
-            prep.orchestratorInitTx,
-            activeWalletAddress
-          );
-        }
-
-        if (prep?.sessionInitTxs && prep.sessionInitTxs.length > 0) {
-          sessionSigs = await signAndSendAll(
-            connection,
-            { signTransaction },
-            prep.sessionInitTxs,
-            activeWalletAddress
-          );
+        if (!currentId) throw new Error('Missing transfer ID');
+        // Re-prepare right before signing: the keeper steps ate most of the
+        // previous blockhash's ~60-90s lifetime.
+        let prep = await reprepare(currentId);
+        // Sign one by one, tracking what is done, so a blockhash retry only
+        // re-signs the txs that have not gone out yet. The fresh prepare
+        // returns the same txs in the same order per kind, so the index
+        // mapping holds; a kind that already finished is skipped.
+        const signRemaining = async (p: PreparedTxs) => {
+          if (p.routeInitTxs) {
+            for (let i = routeSigs.length; i < p.routeInitTxs.length; i++) {
+              routeSigs.push(
+                await signAndSend(
+                  connection,
+                  { signTransaction },
+                  p.routeInitTxs[i],
+                  activeWalletAddress
+                )
+              );
+            }
+          }
+          if (p.orchestratorInitTx && !orchSig) {
+            orchSig = await signAndSend(
+              connection,
+              { signTransaction },
+              p.orchestratorInitTx,
+              activeWalletAddress
+            );
+          }
+          if (p.sessionInitTxs) {
+            for (let i = sessionSigs.length; i < p.sessionInitTxs.length; i++) {
+              sessionSigs.push(
+                await signAndSend(
+                  connection,
+                  { signTransaction },
+                  p.sessionInitTxs[i],
+                  activeWalletAddress
+                )
+              );
+            }
+          }
+        };
+        try {
+          await signRemaining(prep);
+        } catch (err) {
+          if (!isBlockhashError(err)) throw err;
+          prep = await reprepare(currentId);
+          await signRemaining(prep);
         }
 
         updateStep(4, {
@@ -941,7 +1018,11 @@ export default function EngineTestPage() {
 
                   {st.status === 'failed' && (
                     <div className="flex items-center gap-2 pl-10 sm:pl-0">
-                      {idx <= 1 && (
+                      {/* Retry is offered up to step 4 (sign remaining txs).
+                          Step 5 (confirm broadcast) cannot retry alone: its
+                          signatures live only in the run's locals, so a
+                          confirm failure needs a full re-run from step 0. */}
+                      {idx <= 4 && (
                         <button
                           type="button"
                           onClick={() => runTransferFromStep(idx)}
@@ -971,7 +1052,7 @@ export default function EngineTestPage() {
                       Live Transfer Monitor
                     </h2>
                     <span className="font-mono text-[12px] text-[#9A9AB0]">
-                      ID: {String(transferRecord.id)}
+                      ID: {String(transferId ?? transferRecord.id)}
                     </span>
                   </div>
                 </div>
