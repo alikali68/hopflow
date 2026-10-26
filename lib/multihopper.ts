@@ -90,11 +90,15 @@ async function apiRequest<T>(
 ): Promise<T> {
   const apiKey = getApiKey();
   const method = options.method || 'GET';
+  // Only declare a JSON body when we actually send one: the API rejects an
+  // empty body sent with Content-Type: application/json (prepare has no body).
   const headers: Record<string, string> = {
     'x-api-key': apiKey,
-    'Content-Type': 'application/json',
     ...options.headers,
   };
+  if (options.body !== undefined) {
+    headers['Content-Type'] = 'application/json';
+  }
 
   if (method === 'POST') {
     headers['Idempotency-Key'] = crypto.randomUUID();
