@@ -16,18 +16,20 @@ export interface Estimate {
 
 export interface RouteHopInput {
   wallet: string;
+  waitSeconds: number;
 }
 
 export interface CreateTransferInput {
   tokenMint: string;
   amountRaw: string;
-  amountTokens?: string | number;
+  amountTokens?: string;
   tokenDecimals: number;
   tokenSymbol: string;
   sourceOwner: string;
   recipientWallet: string;
-  hops: number;
-  arrivalSeconds: number;
+  // Custom route: pass `route` INSTEAD of `hops`/`arrivalSeconds` (docs: not combined).
+  hops?: number;
+  arrivalSeconds?: number;
   externalId?: string;
   route: {
     hops: RouteHopInput[];
@@ -133,7 +135,8 @@ export async function estimateFee(input: {
   tokenMint: string;
   amountRaw: string;
   tokenDecimals: number;
-  hops: number;
+  hops?: number;
+  route?: { hops: RouteHopInput[] };
 }): Promise<Estimate> {
   return apiRequest<Estimate>('/transfers/estimate', {
     method: 'POST',

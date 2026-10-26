@@ -38,15 +38,14 @@ export default function EngineTestPage() {
   const { connection } = useConnection();
   const { publicKey, signTransaction, connected } = useWallet();
 
-  const [recipientWallet, setRecipientWallet] = useState(DEFAULT_SOURCE_WALLET);
+  const [recipientWallet, setRecipientWallet] = useState('');
   const [amountSol, setAmountSol] = useState('0.1');
-  const [hopsCount, setHopsCount] = useState(3);
-  const [arrivalSeconds, setArrivalSeconds] = useState(300);
   const [externalId, setExternalId] = useState('hopflow-engine-test-001');
 
   const [hop1, setHop1] = useState(DEFAULT_HOP_1);
+  const [wait1, setWait1] = useState(120);
   const [hop2, setHop2] = useState(DEFAULT_HOP_2);
-  const [hop3, setHop3] = useState(DEFAULT_SOURCE_WALLET);
+  const [wait2, setWait2] = useState(120);
 
   const [estimate, setEstimate] = useState<Estimate | null>(null);
   const [estimateLoading, setEstimateLoading] = useState(false);
@@ -76,27 +75,34 @@ export default function EngineTestPage() {
 
   const activeWalletAddress = publicKey?.toBase58() || DEFAULT_SOURCE_WALLET;
 
+  // Wallet button renders only after mount: the adapter renders a different
+  // button on the client than on the server, which breaks hydration.
+  const [mounted, setMounted] = useState(false);
   useEffect(() => {
-    if (publicKey) {
-      const pub = publicKey.toBase58();
-      setRecipientWallet((prev) => (prev === DEFAULT_SOURCE_WALLET ? pub : prev));
-      setHop3((prev) => (prev === DEFAULT_SOURCE_WALLET ? pub : prev));
-    }
-  }, [publicKey]);
+    setMounted(true);
+  }, []);
 
   const isRecipientValid = SOLANA_ADDRESS_REGEX.test(recipientWallet.trim());
   const isHop1Valid = SOLANA_ADDRESS_REGEX.test(hop1.trim());
   const isHop2Valid = SOLANA_ADDRESS_REGEX.test(hop2.trim());
-  const isHop3Valid = SOLANA_ADDRESS_REGEX.test(hop3.trim());
+  const isWait1Valid = Number.isInteger(wait1) && wait1 >= 20 && wait1 <= 2592000;
+  const isWait2Valid = Number.isInteger(wait2) && wait2 >= 20 && wait2 <= 2592000;
   const isAmountValid = Number(amountSol) > 0 && !isNaN(Number(amountSol));
-  const isHopsValid = hopsCount >= 3 && hopsCount <= 10;
+  // Custom route rules (docs): recipient must differ from the source and from
+  // every hop; hops must be unique.
+  const isRouteDistinct =
+    recipientWallet.trim() !== activeWalletAddress &&
+    recipientWallet.trim() !== hop1.trim() &&
+    recipientWallet.trim() !== hop2.trim() &&
+    hop1.trim() !== hop2.trim();
   const isFormValid =
     isRecipientValid &&
     isHop1Valid &&
     isHop2Valid &&
-    isHop3Valid &&
+    isWait1Valid &&
+    isWait2Valid &&
     isAmountValid &&
-    isHopsValid;
+    isRouteDistinct;
 
   const updateStep = (index: number, patch: Partial<StepState>) => {
     setSteps((prev) => {
@@ -118,7 +124,12 @@ export default function EngineTestPage() {
           tokenMint: SOL_MINT,
           amountRaw: String(parsedAmount),
           tokenDecimals: 9,
-          hops: hopsCount,
+          route: {
+            hops: [
+              { wallet: hop1.trim(), waitSeconds: wait1 },
+              { wallet: hop2.trim(), waitSeconds: wait2 },
+            ],
+          },
         }),
       });
       const data = await res.json();
@@ -180,19 +191,17 @@ export default function EngineTestPage() {
         const payload = {
           tokenMint: SOL_MINT,
           amountRaw: rawLamports,
-          amountTokens: Number(amountSol),
+          amountTokens: amountSol,
           tokenDecimals: 9,
           tokenSymbol: 'SOL',
           sourceOwner: activeWalletAddress,
           recipientWallet: recipientWallet.trim(),
-          hops: hopsCount,
-          arrivalSeconds: Number(arrivalSeconds),
           externalId: externalId.trim() || undefined,
+          // Custom route: route ONLY — never send hops/arrivalSeconds with it.
           route: {
             hops: [
-              { wallet: hop1.trim() },
-              { wallet: hop2.trim() },
-              { wallet: hop3.trim() },
+              { wallet: hop1.trim(), waitSeconds: wait1 },
+              { wallet: hop2.trim(), waitSeconds: wait2 },
             ],
           },
         };
@@ -443,7 +452,13 @@ export default function EngineTestPage() {
           </div>
 
           <div className="flex items-center">
-            <WalletMultiButton className="!h-[44px] !rounded-xl !bg-gradient-to-r !from-[#9945FF] !to-[#14F195] !px-5 !font-display !text-[14px] !font-bold !text-white !shadow-[0_0_20px_rgba(153,69,255,0.35)] transition-all hover:!brightness-110" />
+            {mounted ? (
+              <WalletMultiButton className="!h-[44px] !rounded-xl !bg-gradient-to-r !from-[#9945FF] !to-[#14F195] !px-5 !font-display !text-[14px] !font-bold !text-white !shadow-[0_0_20px_rgba(153,69,255,0.35)] transition-all hover:!brightness-110" />
+            ) : (
+              <div className="flex h-[44px] items-center rounded-xl bg-gradient-to-r from-[#9945FF] to-[#14F195] px-5 font-display text-[14px] font-bold text-white opacity-70">
+                Select Wallet
+              </div>
+            )}
           </div>
         </header>
 
@@ -484,11 +499,17 @@ export default function EngineTestPage() {
                   type="text"
                   value={recipientWallet}
                   onChange={(e) => setRecipientWallet(e.target.value)}
-                  className="w-full rounded-xl border border-white/10 bg-white/[0.02] px-3.5 py-2.5 font-mono text-[13.5px] text-white outline-none focus:border-[#9945FF]"
+                  placeholder="Paste Account 4 address from Phantom"
+                  className="w-full rounded-xl border border-white/10 bg-white/[0.02] px-3.5 py-2.5 font-mono text-[13.5px] text-white outline-none placeholder:text-[#5C5C72] focus:border-[#9945FF]"
                 />
-                {!isRecipientValid && (
+                {!isRecipientValid && recipientWallet.trim() !== '' && (
                   <span className="mt-1 block text-[11px] text-[#F26D6D]">
                     Invalid Base58 Solana public key (32–44 chars).
+                  </span>
+                )}
+                {isRecipientValid && !isRouteDistinct && (
+                  <span className="mt-1 block text-[11px] text-[#F26D6D]">
+                    Recipient must differ from the source wallet and from every hop.
                   </span>
                 )}
               </div>
@@ -514,34 +535,11 @@ export default function EngineTestPage() {
 
               <div>
                 <label className="mb-1.5 block text-[12px] font-semibold uppercase tracking-wider text-[#9A9AB0]">
-                  Hops Count (3–10)
+                  Route Total Wait
                 </label>
-                <input
-                  type="number"
-                  min={3}
-                  max={10}
-                  value={hopsCount}
-                  onChange={(e) => setHopsCount(Number(e.target.value))}
-                  className="w-full rounded-xl border border-white/10 bg-white/[0.02] px-3.5 py-2.5 font-display text-[14px] font-bold text-white outline-none focus:border-[#9945FF]"
-                />
-                {!isHopsValid && (
-                  <span className="mt-1 block text-[11px] text-[#F26D6D]">
-                    Hops must be between 3 and 10.
-                  </span>
-                )}
-              </div>
-
-              <div>
-                <label className="mb-1.5 block text-[12px] font-semibold uppercase tracking-wider text-[#9A9AB0]">
-                  Arrival Seconds
-                </label>
-                <input
-                  type="number"
-                  min={30}
-                  value={arrivalSeconds}
-                  onChange={(e) => setArrivalSeconds(Number(e.target.value))}
-                  className="w-full rounded-xl border border-white/10 bg-white/[0.02] px-3.5 py-2.5 text-[14px] text-white outline-none focus:border-[#9945FF]"
-                />
+                <div className="flex h-[42px] items-center rounded-xl border border-white/10 bg-white/[0.02] px-3.5 font-display text-[14px] font-bold text-white">
+                  {wait1 + wait2}s · 2 hops + recipient (3 on chain)
+                </div>
               </div>
 
               <div>
@@ -573,6 +571,25 @@ export default function EngineTestPage() {
                 )}
               </div>
 
+              <div>
+                <label className="mb-1.5 block text-[12px] font-semibold uppercase tracking-wider text-[#9A9AB0]">
+                  Hop 1 Wait (seconds)
+                </label>
+                <input
+                  type="number"
+                  min={20}
+                  max={2592000}
+                  value={wait1}
+                  onChange={(e) => setWait1(Number(e.target.value))}
+                  className="w-full rounded-xl border border-white/10 bg-white/[0.02] px-3.5 py-2.5 text-[14px] text-white outline-none focus:border-[#9945FF]"
+                />
+                {!isWait1Valid && (
+                  <span className="mt-1 block text-[11px] text-[#F26D6D]">
+                    Wait must be 20–2,592,000 seconds.
+                  </span>
+                )}
+              </div>
+
               <div className="sm:col-span-2">
                 <label className="mb-1.5 block text-[12px] font-semibold uppercase tracking-wider text-[#9A9AB0]">
                   Hop 2 Wallet
@@ -590,19 +607,21 @@ export default function EngineTestPage() {
                 )}
               </div>
 
-              <div className="sm:col-span-2">
+              <div>
                 <label className="mb-1.5 block text-[12px] font-semibold uppercase tracking-wider text-[#9A9AB0]">
-                  Hop 3 Wallet (Round-trip default)
+                  Hop 2 Wait (seconds)
                 </label>
                 <input
-                  type="text"
-                  value={hop3}
-                  onChange={(e) => setHop3(e.target.value)}
-                  className="w-full rounded-xl border border-white/10 bg-white/[0.02] px-3.5 py-2.5 font-mono text-[13px] text-white outline-none focus:border-[#9945FF]"
+                  type="number"
+                  min={20}
+                  max={2592000}
+                  value={wait2}
+                  onChange={(e) => setWait2(Number(e.target.value))}
+                  className="w-full rounded-xl border border-white/10 bg-white/[0.02] px-3.5 py-2.5 text-[14px] text-white outline-none focus:border-[#9945FF]"
                 />
-                {!isHop3Valid && (
+                {!isWait2Valid && (
                   <span className="mt-1 block text-[11px] text-[#F26D6D]">
-                    Invalid Base58 Solana public key.
+                    Wait must be 20–2,592,000 seconds.
                   </span>
                 )}
               </div>
@@ -842,7 +861,7 @@ export default function EngineTestPage() {
               {/* Mini-route diagram */}
               <div className="grad-border-soft mt-4 flex flex-col gap-2 rounded-xl p-4">
                 <span className="text-[11px] font-semibold uppercase tracking-wider text-[#9A9AB0]">
-                  Route Path
+                  Route Path · total wait {wait1 + wait2}s
                 </span>
                 <div className="flex flex-wrap items-center gap-2 text-[12.5px] font-mono text-white">
                   <span className="rounded bg-white/5 px-2 py-1">
@@ -850,19 +869,18 @@ export default function EngineTestPage() {
                   </span>
                   <span>→</span>
                   <span className="rounded bg-white/5 px-2 py-1">
-                    {hop1.slice(0, 4)}...{hop1.slice(-4)} (Hop 1)
+                    {hop1.slice(0, 4)}...{hop1.slice(-4)} (Hop 1 · {wait1}s)
                   </span>
                   <span>→</span>
                   <span className="rounded bg-white/5 px-2 py-1">
-                    {hop2.slice(0, 4)}...{hop2.slice(-4)} (Hop 2)
-                  </span>
-                  <span>→</span>
-                  <span className="rounded bg-white/5 px-2 py-1">
-                    {hop3.slice(0, 4)}...{hop3.slice(-4)} (Hop 3)
+                    {hop2.slice(0, 4)}...{hop2.slice(-4)} (Hop 2 · {wait2}s)
                   </span>
                   <span>→</span>
                   <span className="rounded bg-white/5 px-2 py-1 text-[#14F195]">
-                    {recipientWallet.slice(0, 4)}...{recipientWallet.slice(-4)} (Recipient)
+                    {recipientWallet.length >= 8
+                      ? `${recipientWallet.slice(0, 4)}...${recipientWallet.slice(-4)}`
+                      : '—'}{' '}
+                    (Recipient)
                   </span>
                 </div>
               </div>
