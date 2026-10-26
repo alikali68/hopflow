@@ -1,6 +1,8 @@
 import React from 'react';
 import { MilestoneDraft } from './milestoneTypes';
-import { GripIcon, CalendarIcon, ChevronUpIcon, ChevronDownIcon, TrashIcon } from '../icons';
+import { GripIcon, ChevronUpIcon, ChevronDownIcon, TrashIcon } from '../icons';
+import DatePicker from '../ui/DatePicker';
+import { parseShortDate, formatShortDate } from '@/lib/dates';
 
 const FIELD =
   'rounded-xl border border-white/10 bg-white/[0.04] text-white placeholder-[#5C5C72] outline-none transition-colors focus:border-[#9945FF]/70 focus:ring-2 focus:ring-[#9945FF]/25';
@@ -93,19 +95,14 @@ export default function MilestoneRow({
           </span>
         </div>
 
-        <div className="relative w-[180px] shrink-0">
-          <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[#9A9AB0]">
-            <CalendarIcon size={15} />
-          </span>
-          <input
-            type="text"
-            value={milestone.due}
-            onChange={(e) => onChange({ due: e.target.value })}
-            placeholder="Due date"
-            aria-label="Milestone due date"
-            className={`${FIELD} h-[40px] w-full pl-9 pr-3 text-[13.5px]`}
-          />
-        </div>
+        <DatePicker
+          value={parseShortDate(milestone.due)}
+          onChange={(date) => onChange({ due: formatShortDate(date) })}
+          minDate={new Date()}
+          placeholder="Due date"
+          ariaLabel="Milestone due date"
+          className="w-[180px] shrink-0"
+        />
 
         <div className="flex-1" />
 
