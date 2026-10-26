@@ -1,6 +1,7 @@
 // lib/signing.ts
 import { Buffer } from 'buffer';
 import { Connection, VersionedTransaction } from '@solana/web3.js';
+import { verifyPreparedTx } from './txverify';
 
 export interface SignerWallet {
   signTransaction: (tx: VersionedTransaction) => Promise<VersionedTransaction>;
@@ -22,8 +23,13 @@ export function toBase64(tx: EncodedTx): string {
 export async function signAndSend(
   connection: Connection,
   wallet: SignerWallet,
-  base64Tx: EncodedTx
+  base64Tx: EncodedTx,
+  // The wallet that must pay for and own this tx. Verification runs BEFORE
+  // any signature prompt: a prepared tx with an unexpected program or a
+  // different fee payer is refused, never signed.
+  expectedFeePayer: string
 ): Promise<string> {
+  verifyPreparedTx(base64Tx, expectedFeePayer);
   const txBytes = Buffer.from(toBase64(base64Tx), 'base64');
   const transaction = VersionedTransaction.deserialize(txBytes);
 
@@ -41,11 +47,17 @@ export async function signAndSend(
 export async function signAndSendAll(
   connection: Connection,
   wallet: SignerWallet,
-  base64Txs: EncodedTx[]
+  base64Txs: EncodedTx[],
+  expectedFeePayer: string
 ): Promise<string[]> {
   const signatures: string[] = [];
   for (const base64Tx of base64Txs) {
-    const signature = await signAndSend(connection, wallet, base64Tx);
+    const signature = await signAndSend(
+      connection,
+      wallet,
+      base64Tx,
+      expectedFeePayer
+    );
     signatures.push(signature);
   }
   return signatures;

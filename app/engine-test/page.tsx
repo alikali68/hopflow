@@ -16,6 +16,12 @@ import {
   PulseIcon,
 } from '@/components/icons';
 import { signAndSend, signAndSendAll } from '@/lib/signing';
+import { verifyPreparedBundle } from '@/lib/txverify';
+import {
+  signAuthMessage,
+  authHeaders,
+  type WalletAuth,
+} from '@/lib/client-auth';
 import type { Estimate, Transfer, PreparedTxs } from '@/lib/multihopper';
 
 const SOL_MINT = 'So11111111111111111111111111111111111111112';
@@ -36,7 +42,7 @@ interface StepState {
 
 export default function EngineTestPage() {
   const { connection } = useConnection();
-  const { publicKey, signTransaction, connected } = useWallet();
+  const { publicKey, signTransaction, signMessage, connected } = useWallet();
 
   const [recipientWallet, setRecipientWallet] = useState('');
   const [amountSol, setAmountSol] = useState('0.1');
@@ -73,6 +79,13 @@ export default function EngineTestPage() {
   } | null>(null);
   const [keeperSignature, setKeeperSignature] = useState<string | null>(null);
 
+  // Wallet auth (SECURITY-REVIEW.md #1): a signed message proving the caller
+  // owns the connected wallet. The proxy requires it on every mutating call.
+  const [walletAuth, setWalletAuth] = useState<WalletAuth | null>(null);
+  const [authError, setAuthError] = useState<string | null>(null);
+  // Human-readable result of the prepared-tx verification (SECURITY-REVIEW.md #2).
+  const [txVerified, setTxVerified] = useState<string | null>(null);
+
   const activeWalletAddress = publicKey?.toBase58() || DEFAULT_SOURCE_WALLET;
 
   // Wallet button renders only after mount: the adapter renders a different
@@ -81,6 +94,30 @@ export default function EngineTestPage() {
   useEffect(() => {
     setMounted(true);
   }, []);
+
+  // Wallet auth: once the wallet connects, sign the auth message so the API
+  // proxy knows the caller owns the wallet. The signature is reused for the
+  // whole session; the server checks it on every mutating call. One extra
+  // Phantom prompt on connect — no funds move.
+  const authSigningRef = useRef(false);
+  useEffect(() => {
+    if (!connected || !publicKey || !signMessage) return;
+    const address = publicKey.toBase58();
+    if (walletAuth?.address === address || authSigningRef.current) return;
+    authSigningRef.current = true;
+    setAuthError(null);
+    signAuthMessage(address, signMessage)
+      .then((auth) => {
+        setWalletAuth(auth);
+        authSigningRef.current = false;
+      })
+      .catch((err) => {
+        setAuthError(
+          err instanceof Error ? err.message : 'Auth signing failed'
+        );
+        authSigningRef.current = false;
+      });
+  }, [connected, publicKey, signMessage, walletAuth]);
 
   const isRecipientValid = SOLANA_ADDRESS_REGEX.test(recipientWallet.trim());
   const isHop1Valid = SOLANA_ADDRESS_REGEX.test(hop1.trim());
@@ -157,6 +194,7 @@ export default function EngineTestPage() {
     setTransferId(null);
     setTransferRecord(null);
     setPollingActive(false);
+    setTxVerified(null);
     setSteps([
       { label: 'Create transfer', status: 'idle' },
       { label: 'Prepare transactions', status: 'idle' },
@@ -175,6 +213,15 @@ export default function EngineTestPage() {
       });
       return;
     }
+    if (!walletAuth) {
+      updateStep(startIndex, {
+        status: 'failed',
+        error:
+          'Wallet auth required — connect your wallet and sign the auth message first.',
+      });
+      return;
+    }
+    const headers = authHeaders(walletAuth);
 
     setFlowRunning(true);
     let currentId = transferId;
@@ -213,7 +260,7 @@ export default function EngineTestPage() {
 
         const res = await fetch('/api/multihopper/transfers', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json', ...headers },
           body: JSON.stringify(payload),
         });
         const data = await res.json();
@@ -247,6 +294,7 @@ export default function EngineTestPage() {
           `/api/multihopper/transfers/${encodeURIComponent(currentId)}/prepare`,
           {
             method: 'POST',
+            headers,
           }
         );
         const data = await res.json();
@@ -273,9 +321,19 @@ export default function EngineTestPage() {
             }
           )?.resume?.keeperAlreadyFunded === true ||
           data.transfer?.status === 'processing';
+        // SECURITY: verify every prepared tx BEFORE any signing prompt — the
+        // fee payer must be this wallet and every program must be on the
+        // allowlist. A throw here fails step 1 and the flow never signs.
+        const verification = verifyPreparedBundle(
+          data.preparedTxs,
+          activeWalletAddress
+        );
+        setTxVerified(
+          `${verification.txCount} txs verified — fee payer is your wallet, ${verification.instructionCount} instructions, all programs allowed`
+        );
         updateStep(1, {
           status: 'done',
-          detail: `Blockhash: ${data.preparedTxs?.recentBlockhash || 'acquired'}`,
+          detail: `Blockhash: ${data.preparedTxs?.recentBlockhash || 'acquired'} · ${verification.txCount} txs verified`,
         });
       }
 
@@ -300,7 +358,8 @@ export default function EngineTestPage() {
           const sig = await signAndSend(
             connection,
             { signTransaction },
-            currentPrepared.preparedTxs.keeperFundingTx
+            currentPrepared.preparedTxs.keeperFundingTx,
+            activeWalletAddress
           );
 
           currentKeeperSig = sig;
@@ -338,7 +397,7 @@ export default function EngineTestPage() {
             `/api/multihopper/transfers/${encodeURIComponent(currentId)}/confirm-broadcast`,
             {
               method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
+              headers: { 'Content-Type': 'application/json', ...headers },
               body: JSON.stringify({
                 keeperFundingSignature: currentKeeperSig,
                 routeInitSignatures: [],
@@ -385,7 +444,8 @@ export default function EngineTestPage() {
           routeSigs = await signAndSendAll(
             connection,
             { signTransaction },
-            prep.routeInitTxs
+            prep.routeInitTxs,
+            activeWalletAddress
           );
         }
 
@@ -393,7 +453,8 @@ export default function EngineTestPage() {
           orchSig = await signAndSend(
             connection,
             { signTransaction },
-            prep.orchestratorInitTx
+            prep.orchestratorInitTx,
+            activeWalletAddress
           );
         }
 
@@ -401,7 +462,8 @@ export default function EngineTestPage() {
           sessionSigs = await signAndSendAll(
             connection,
             { signTransaction },
-            prep.sessionInitTxs
+            prep.sessionInitTxs,
+            activeWalletAddress
           );
         }
 
@@ -425,7 +487,7 @@ export default function EngineTestPage() {
           `/api/multihopper/transfers/${encodeURIComponent(currentId)}/confirm-broadcast`,
           {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 'Content-Type': 'application/json', ...headers },
             body: JSON.stringify({
               keeperFundingSignature: currentKeeperSig || undefined,
               routeInitSignatures: routeSigs,
@@ -464,7 +526,10 @@ export default function EngineTestPage() {
   const pollTransfer = useCallback(async () => {
     if (!transferId) return;
     try {
-      const res = await fetch(`/api/multihopper/transfers/${encodeURIComponent(transferId)}`);
+      const res = await fetch(
+        `/api/multihopper/transfers/${encodeURIComponent(transferId)}`,
+        { headers: authHeaders(walletAuth) }
+      );
       const data = await res.json();
       if (res.ok && !data.error) {
         setTransferRecord(data);
@@ -479,7 +544,7 @@ export default function EngineTestPage() {
     } catch {
       // transient network error
     }
-  }, [transferId]);
+  }, [transferId, walletAuth]);
 
   const pollRef = useRef(pollTransfer);
   useEffect(() => {
@@ -537,6 +602,35 @@ export default function EngineTestPage() {
               <span className="text-[13px] text-[#9A9AB0]">
                 Connect your Phantom devnet wallet above to configure routes and execute the vertical slice.
               </span>
+            </div>
+          </div>
+        )}
+
+        {connected && (
+          <div className="grad-border flex items-center gap-3 rounded-2xl p-4">
+            <span className="icon-tile flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-[#14F195]">
+              <LockIcon size={20} />
+            </span>
+            <div className="flex flex-col">
+              <span className="text-[14px] font-semibold text-white">
+                {walletAuth
+                  ? 'Wallet authenticated — API calls are signed'
+                  : authError
+                    ? 'Wallet auth failed'
+                    : 'Signing wallet auth message…'}
+              </span>
+              <span className="text-[13px] text-[#9A9AB0]">
+                {walletAuth
+                  ? `Signed as ${walletAuth.address.slice(0, 4)}…${walletAuth.address.slice(-4)} — the proxy only accepts calls from this wallet.`
+                  : authError
+                    ? `${authError} — reconnect the wallet to retry.`
+                    : 'One extra Phantom prompt: it proves you own this wallet. No funds move.'}
+              </span>
+              {txVerified && (
+                <span className="mt-1 text-[13px] font-semibold text-[#14F195]">
+                  ✓ {txVerified}
+                </span>
+              )}
             </div>
           </div>
         )}

@@ -31,10 +31,17 @@ export default function ApprovalBox({ milestone }: ApprovalBoxProps) {
 
   const amountLabel = `${fmt0(milestone.amount)} ${TOKEN}`;
 
+  // Deliverable links come from project data. Only render a link when the
+  // value is a plain hostname — anything else (spaces, slashes, @, scheme)
+  // is shown as text, never linked (SECURITY-REVIEW.md #7).
+  const SAFE_HOSTNAME = /^[a-z0-9-]+(\.[a-z0-9-]+)+$/i;
+  const isSafeDeliverable =
+    !!milestone.deliverable && SAFE_HOSTNAME.test(milestone.deliverable);
+
   return (
     <div className="grad-border-soft mt-3 w-full rounded-xl p-4 shadow-[inset_0_0_24px_rgba(153,69,255,0.06)]">
-      {/* Deliverable Link */}
-      {milestone.deliverable && (
+      {/* Deliverable Link — plain text when the value is not a safe hostname */}
+      {milestone.deliverable && isSafeDeliverable && (
         <a
           href={`https://${milestone.deliverable}`}
           target="_blank"
@@ -46,6 +53,11 @@ export default function ApprovalBox({ milestone }: ApprovalBoxProps) {
           </span>
           <ArrowUpRightIcon size={14} className="text-[#14F195]" />
         </a>
+      )}
+      {milestone.deliverable && !isSafeDeliverable && (
+        <span className="inline-flex items-center gap-1.5 text-[13.5px] font-semibold text-[#B8B8C7]">
+          {milestone.deliverable}
+        </span>
       )}
 
       {/* Freelancer Note */}

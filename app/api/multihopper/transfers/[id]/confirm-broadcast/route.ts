@@ -1,15 +1,38 @@
 // app/api/multihopper/transfers/[id]/confirm-broadcast/route.ts
 import { NextRequest, NextResponse } from 'next/server';
-import { confirmBroadcast } from '@/lib/multihopper';
+import { confirmBroadcast, getTransfer } from '@/lib/multihopper';
+import { guardRoute, readJsonBody, verifyWalletAuth } from '@/lib/api-guard';
 
 export async function POST(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const guard = guardRoute(req, { limit: 30, auth: true });
+    if (guard) return guard;
     const { id } = await params;
-    const body = await req.json();
-    const data = await confirmBroadcast(id, body);
+    // A caller may only confirm their own transfer.
+    const existing = await getTransfer(id);
+    const auth = verifyWalletAuth(req);
+    if (existing.sourceOwner && auth && existing.sourceOwner !== auth.address) {
+      return NextResponse.json(
+        {
+          error: {
+            code: 'FORBIDDEN',
+            message: 'This transfer belongs to a different wallet.',
+          },
+        },
+        { status: 403 }
+      );
+    }
+    const { body, error } = await readJsonBody<{
+      keeperFundingSignature?: string;
+      routeInitSignatures?: string[];
+      orchestratorInitSignature?: string;
+      sessionInitSignatures?: string[];
+    }>(req);
+    if (error) return error;
+    const data = await confirmBroadcast(id, body ?? {});
     return NextResponse.json(data);
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Unknown error';

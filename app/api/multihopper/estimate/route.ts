@@ -1,13 +1,23 @@
 // app/api/multihopper/estimate/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import { estimateFee } from '@/lib/multihopper';
+import { guardRoute, readJsonBody } from '@/lib/api-guard';
 
 const SOLANA_ADDRESS_REGEX = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/;
 
 export async function POST(req: NextRequest) {
   try {
-    const body = await req.json();
-    const { tokenMint, amountRaw, tokenDecimals, hops, route } = body;
+    const guard = guardRoute(req, { limit: 30 });
+    if (guard) return guard;
+    const { body, error } = await readJsonBody<{
+      tokenMint?: unknown;
+      amountRaw?: unknown;
+      tokenDecimals?: unknown;
+      hops?: unknown;
+      route?: { hops?: unknown };
+    }>(req);
+    if (error) return error;
+    const { tokenMint, amountRaw, tokenDecimals, hops, route } = body ?? {};
 
     if (!amountRaw || typeof amountRaw !== 'string' || !/^\d+$/.test(amountRaw) || BigInt(amountRaw) <= BigInt(0)) {
       return NextResponse.json(

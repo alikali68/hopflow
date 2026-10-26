@@ -111,6 +111,8 @@ async function apiRequest<T>(
     headers,
     body: options.body !== undefined ? JSON.stringify(options.body) : undefined,
     cache: 'no-store',
+    // Never hang forever on a stalled API (observed once: a 20s+ silence).
+    signal: AbortSignal.timeout(15000),
   });
 
   const rawText = await res.text();
@@ -200,9 +202,14 @@ export async function listTransfers(params?: {
   if (params?.status) query.set('status', params.status);
   if (params?.limit) query.set('limit', String(params.limit));
   const qs = query.toString() ? `?${query.toString()}` : '';
-  return apiRequest<Transfer[]>(`/transfers${qs}`, {
-    method: 'GET',
-  });
+  // The API returns { items: [...] }, not a bare array — normalize both.
+  const res = await apiRequest<Transfer[] | { items?: Transfer[] }>(
+    `/transfers${qs}`,
+    {
+      method: 'GET',
+    }
+  );
+  return Array.isArray(res) ? res : (res.items ?? []);
 }
 
 export async function getUsage(): Promise<unknown> {

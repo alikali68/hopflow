@@ -1,9 +1,12 @@
 // app/api/multihopper/usage/route.ts
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { getUsage } from '@/lib/multihopper';
+import { guardRoute } from '@/lib/api-guard';
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
+    const guard = guardRoute(req, { limit: 60, auth: true });
+    if (guard) return guard;
     const usage = await getUsage();
     return NextResponse.json(usage);
   } catch (err) {

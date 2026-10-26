@@ -22,7 +22,10 @@ export default function WalletProvider({
 
   return (
     <ConnectionProvider endpoint={DEVNET_ENDPOINT}>
-      <SolanaWalletProvider wallets={wallets} autoConnect>
+      {/* autoConnect deliberately OFF (SECURITY-REVIEW.md): on a shared PC a
+          silent reconnect could attach the wrong wallet. The user connects
+          explicitly with one click. */}
+      <SolanaWalletProvider wallets={wallets}>
         <WalletModalProvider>{children}</WalletModalProvider>
       </SolanaWalletProvider>
     </ConnectionProvider>
