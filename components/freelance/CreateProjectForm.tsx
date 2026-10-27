@@ -2,11 +2,10 @@
 
 import React, { useState } from 'react';
 import { CheckCircleIcon, ChevronRightIcon } from '../icons';
+import { isValidSolanaAddress } from '../payroll/addMembersData';
 
 const INPUT_BASE =
   'w-full rounded-xl border border-[#262637] bg-white/[0.02] px-4 text-[15px] text-white placeholder-[#5C5C72] outline-none transition-colors focus:border-[#9945FF]/60 focus:ring-2 focus:ring-[#9945FF]/20';
-
-const SOLANA_ADDRESS_REGEX = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/;
 
 function WhiteCheck({ size = 14 }: { size?: number }) {
   return (
@@ -21,11 +20,11 @@ export default function CreateProjectForm() {
   const [description, setDescription] = useState(
     'Redesign the marketing website with responsive layouts and updated branding.\n\nInclude new landing pages, refreshed UI components, and SEO improvements.',
   );
-  const [wallet, setWallet] = useState('8aKp9f3mBxQ7vR2sT8wZ4nH6jK1cD5eF9gA3bN7pM');
+  const [wallet, setWallet] = useState('GUngqtYDsULGwwCSjQxkD6V7AytT4FaPp3ReSuPdFaE2');
   const [amount, setAmount] = useState('2500');
   const [token, setToken] = useState<'USDC' | 'SOL'>('USDC');
 
-  const isValidWallet = SOLANA_ADDRESS_REGEX.test(wallet.trim());
+  const isValidWallet = isValidSolanaAddress(wallet.trim());
   const showInvalidWarning = wallet.trim().length > 0 && !isValidWallet;
 
   const handleAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {

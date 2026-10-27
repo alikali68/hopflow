@@ -15,7 +15,7 @@ export const PROTOCOL_FEE_BPS = 50; // 0.5%
 export const SEED_HOPS: HopDraft[] = [
   { id: 'hop-1', wallet: '7xQp9mK2vRt8wXy4nBc6dEf1gHj3kLm5nPp7qRs9mN2k', amount: 0.1, token: 'SOL' },
   { id: 'hop-2', wallet: '3kLm8pQr4vWx2nBc5dEf7gHj9kLm1nPp3qRs6tUv9pQr', amount: 0.1, token: 'SOL' },
-  { id: 'hop-3', wallet: '9xRt8dEf3gHj6kLm9nPp1qRs5tUv7wXy2zAb4wE4v', amount: 0.1, token: 'SOL' },
+  { id: 'hop-3', wallet: 'Dke7ajmqt53gc8ijCkBmw4BVueMxDGeiPvbV2tZHsTba', amount: 0.1, token: 'SOL' },
 ];
 
 export function formatSol(n: number): string {

@@ -23,7 +23,7 @@ export type DashboardMember = {
 export const DASHBOARD_MEMBERS: DashboardMember[] = [
   { id: 'm1', name: 'Sara Kim', wallet: '7xQp9mK2vRt8wXy4nBc6dEf1gHj3kLm5nPp7qRs9mN2k', salaryUsdc: 1200, lastPaid: 'Oct 1, 2026' },
   { id: 'm2', name: 'Alex Chen', wallet: '3kLm8pQr4vWx2nBc5dEf7gHj9kLm1nPp3qRs6tUv9pQr', salaryUsdc: 900, lastPaid: 'Oct 1, 2026' },
-  { id: 'm3', name: 'Maria Lopez', wallet: '9xRt8dEf3gHj6kLm9nPp1qRs5tUv7wXy2zAb4wE4v', salaryUsdc: 1000, lastPaid: 'Oct 1, 2026' },
+  { id: 'm3', name: 'Maria Lopez', wallet: 'DcvRkmikDimyvLDDEY3fupyygfCa7dbV2sMTgMfxvrQA', salaryUsdc: 1000, lastPaid: 'Oct 1, 2026' },
   { id: 'm4', name: 'Omar Rahimi', wallet: '5mKp7tUv3wXy8nBc2dEf6gHj9kLm4nPp8qRs1tVw6zY4', salaryUsdc: 600, lastPaid: 'Oct 1, 2026' },
   { id: 'm5', name: 'Lena Park', wallet: '8nQs2wEr5tYu7iPp3aSd9fGh4jKk6mNb1vCx3zXc8dF2', salaryUsdc: 500, lastPaid: 'Oct 1, 2026' },
 ];

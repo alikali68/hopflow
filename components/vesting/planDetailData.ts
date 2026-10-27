@@ -20,7 +20,7 @@ export type PlanBeneficiary = {
 export const DETAIL_BENEFICIARIES: PlanBeneficiary[] = [
   { id: 'b1', name: 'Sara Kim', wallet: '7xQp9mK2vRt8wXy4nBc6dEf1gHj3kLm5nPp7qRs9mN2k', sharePercent: 40, releasedFlow: 152000, remainingFlow: 248000 },
   { id: 'b2', name: 'Alex Chen', wallet: '3kLm8pQr4vWx2nBc5dEf7gHj9kLm1nPp3qRs6tUv9pQr', sharePercent: 30, releasedFlow: 114000, remainingFlow: 186000 },
-  { id: 'b3', name: 'Maria Lopez', wallet: '9xRt8dEf3gHj6kLm9nPp1qRs5tUv7wXy2zAb4wE4v', sharePercent: 20, releasedFlow: 76000, remainingFlow: 124000 },
+  { id: 'b3', name: 'Maria Lopez', wallet: 'DcvRkmikDimyvLDDEY3fupyygfCa7dbV2sMTgMfxvrQA', sharePercent: 20, releasedFlow: 76000, remainingFlow: 124000 },
   { id: 'b4', name: 'Omar Rahimi', wallet: '5mKp7tUv3wXy8nBc2dEf6gHj9kLm4nPp8qRs1tVw6zY4', sharePercent: 10, releasedFlow: 38000, remainingFlow: 62000 },
 ];
 
