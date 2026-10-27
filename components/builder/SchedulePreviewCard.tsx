@@ -1,6 +1,6 @@
 import React from 'react';
 import { HopDraft, shortWallet } from './builderData';
-import { formatDateTime } from './scheduleData';
+import { formatExecutionLabel, formatDateTimeTz, formatDateTimeUtc } from '@/lib/route-time';
 
 interface SchedulePreviewCardProps {
   hops: HopDraft[];
@@ -29,24 +29,30 @@ export default function SchedulePreviewCard({
               Hop {i + 1} · {shortWallet(hop.wallet)}
             </span>
             <span className="text-[14px] font-bold text-white">
-              {formatDateTime(executions[i])}
+              {formatExecutionLabel(executions[i], i === 0)}
             </span>
           </div>
         ))}
 
         {/* Final Execution Summary */}
-        <div className="flex items-center justify-between py-2.5 pb-0">
+        <div className="flex items-start justify-between gap-3 py-2.5 pb-0">
           <span className="text-[13.5px] text-[#9A9AB0]">
             Route completes
           </span>
-          <span className="font-display text-[14px] font-bold text-white">
-            {formatDateTime(executions[lastIndex])}
+          <span className="text-right">
+            <span className="block font-display text-[14px] font-bold text-white">
+              {formatDateTimeTz(executions[lastIndex])}
+            </span>
+            <span className="mt-0.5 block text-[12px] font-medium text-[#5A5A6E]">
+              {formatDateTimeUtc(executions[lastIndex])}
+            </span>
           </span>
         </div>
       </div>
 
       <p className="mt-3 text-[12px] leading-relaxed text-[#9A9AB0]">
-        Keepers execute each hop automatically — you don't need to stay online.
+        Keepers execute each hop automatically — you don&apos;t need to stay
+        online. Hop 1 runs right after publishing.
       </p>
     </div>
   );

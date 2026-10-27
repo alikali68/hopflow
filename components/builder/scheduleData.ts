@@ -1,5 +1,15 @@
-import { formatLongDate } from '@/lib/dates';
+import { formatDateTimeTz } from '@/lib/dates';
+import {
+  combineDateTime,
+  addDays,
+  addHours,
+  isValidTime,
+  computeExecutionTimes,
+} from '@/lib/route-time';
 import { SEED_HOPS, HopDraft, shortWallet } from './builderData';
+
+// Pure date/time helpers live in @/lib/route-time (single source of truth).
+export { combineDateTime, addDays, addHours, isValidTime };
 
 export type ScheduleMode = 'specific' | 'relative';
 export type DelayUnit = 'hours' | 'days';
@@ -22,62 +32,21 @@ export const SEED_SCHEDULES: HopSchedule[] = [
   { hopId: 'hop-3', date: new Date(2026, 10, 3), time: '10:00', delayValue: 24, delayUnit: 'hours' },
 ];
 
-export function isValidTime(value: string): boolean {
-  return /^([01]\d|2[0-3]):[0-5]\d$/.test(value);
-}
-
-export function addDays(date: Date, days: number): Date {
-  const d = new Date(date);
-  d.setDate(d.getDate() + days);
-  return d;
-}
-
-export function addHours(date: Date, hours: number): Date {
-  const d = new Date(date);
-  d.setHours(d.getHours() + hours);
-  return d;
-}
-
-export function combineDateTime(date: Date, time: string): Date | null {
-  if (!isValidTime(time)) return null;
-  const [h, m] = time.split(':').map(Number);
-  const d = new Date(date);
-  d.setHours(h, m, 0, 0);
-  return d;
-}
-
-/** Execution date per hop. Specific: each hop's own date+time. Relative: hop 1 = anchor, later hops = previous + delay. */
+/** Truthful execution instants (see @/lib/route-time): hop 0 runs at deploy
+ * (now), hop i runs at its own picked date+time — or, in relative mode, at
+ * the anchor + its delay. Use computeExecutionTimes with an explicit deploy
+ * time when the deploy moment matters. */
 export function computeExecutionDates(
   mode: ScheduleMode,
   hops: HopDraft[],
   schedules: HopSchedule[],
 ): (Date | null)[] {
-  const results: (Date | null)[] = [];
-  hops.forEach((hop, i) => {
-    const s = schedules.find((x) => x.hopId === hop.id);
-    if (!s) {
-      results.push(null);
-      return;
-    }
-    if (mode === 'specific' || i === 0) {
-      results.push(combineDateTime(s.date, s.time));
-      return;
-    }
-    const prev = results[i - 1];
-    if (!prev) {
-      results.push(null);
-      return;
-    }
-    results.push(s.delayUnit === 'days' ? addDays(prev, s.delayValue) : addHours(prev, s.delayValue));
-  });
-  return results;
+  return computeExecutionTimes(mode, hops, schedules, new Date());
 }
 
+/** Date + time in Tehran time, with its timezone label. */
 export function formatDateTime(date: Date | null): string {
-  if (!date) return '—';
-  const hh = String(date.getHours()).padStart(2, '0');
-  const mm = String(date.getMinutes()).padStart(2, '0');
-  return `${formatLongDate(date)} · ${hh}:${mm}`;
+  return formatDateTimeTz(date);
 }
 
 export { SEED_HOPS, shortWallet };

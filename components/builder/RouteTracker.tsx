@@ -4,6 +4,7 @@ import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { useWallet } from '@solana/wallet-adapter-react';
 import { WalletMultiButton } from '@solana/wallet-adapter-react-ui';
 import { signAuthMessage, authHeaders, type WalletAuth } from '@/lib/client-auth';
+import { formatDateTimeUtc } from '@/lib/dates';
 import type { Transfer } from '@/lib/multihopper';
 import {
   DEMO_ROUTE,
@@ -361,19 +362,31 @@ export default function RouteTracker({ id }: RouteTrackerProps) {
                 )}
 
                 {!isDemo && completedAt ? (
-                  <div className="flex items-center justify-between py-2.5 pb-0">
+                  <div className="flex items-start justify-between gap-3 py-2.5 pb-0">
                     <span className="text-[13.5px] text-[#9A9AB0]">Completed</span>
-                    <span className="font-display text-[14px] font-bold text-white">
-                      {formatDateTime(new Date(completedAt))}
+                    <span className="text-right">
+                      <span className="block font-display text-[14px] font-bold text-white">
+                        {formatDateTime(new Date(completedAt))}
+                      </span>
+                      <span className="mt-0.5 block text-[12px] font-medium text-[#5A5A6E]">
+                        {formatDateTimeUtc(new Date(completedAt))}
+                      </span>
                     </span>
                   </div>
                 ) : isDemo ? (
-                  <div className="flex items-center justify-between py-2.5 pb-0">
+                  <div className="flex items-start justify-between gap-3 py-2.5 pb-0">
                     <span className="text-[13.5px] text-[#9A9AB0]">Scheduled</span>
-                    <span className="font-display text-[14px] font-bold text-white">
-                      {DEMO_ROUTE.hops[0]?.scheduledAt
-                        ? formatDateTime(DEMO_ROUTE.hops[0].scheduledAt)
-                        : '—'}
+                    <span className="text-right">
+                      <span className="block font-display text-[14px] font-bold text-white">
+                        {DEMO_ROUTE.hops[0]?.scheduledAt
+                          ? formatDateTime(DEMO_ROUTE.hops[0].scheduledAt)
+                          : '—'}
+                      </span>
+                      {DEMO_ROUTE.hops[0]?.scheduledAt && (
+                        <span className="mt-0.5 block text-[12px] font-medium text-[#5A5A6E]">
+                          {formatDateTimeUtc(DEMO_ROUTE.hops[0].scheduledAt)}
+                        </span>
+                      )}
                     </span>
                   </div>
                 ) : null}

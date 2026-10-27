@@ -1,13 +1,11 @@
 'use client';
 
-import React, { useState } from 'react';
-import { SEED_HOPS } from './builderData';
+import React from 'react';
 import {
-  SEED_SCHEDULES,
   ScheduleMode,
   HopSchedule,
-  computeExecutionDates,
 } from './scheduleData';
+import { useBuilderRoute } from '@/lib/store';
 import ScheduleModeToggle from './ScheduleModeToggle';
 import HopScheduleRow from './HopScheduleRow';
 import SchedulePreviewCard from './SchedulePreviewCard';
@@ -16,16 +14,21 @@ import HowSchedulingCard from './HowSchedulingCard';
 import { ArrowLeftIcon, ChevronRightIcon } from '@/components/icons';
 
 export default function HopScheduleEditor() {
-  const [mode, setMode] = useState<ScheduleMode>('specific');
-  const [schedules, setSchedules] = useState<HopSchedule[]>(SEED_SCHEDULES);
+  // Truthful execution times from the store (hop 0 = deploy) — the hook
+  // recomputes them whenever hops, schedules, or mode change.
+  const { hops, schedules, mode, executions, dispatch } = useBuilderRoute();
+
+  const setMode = (next: ScheduleMode) =>
+    dispatch({ type: 'builder/setMode', mode: next });
 
   const updateSchedule = (hopId: string, patch: Partial<HopSchedule>) => {
-    setSchedules((prev) =>
-      prev.map((s) => (s.hopId === hopId ? { ...s, ...patch } : s))
-    );
+    dispatch({
+      type: 'builder/setSchedules',
+      schedules: schedules.map((s) =>
+        s.hopId === hopId ? { ...s, ...patch } : s,
+      ),
+    });
   };
-
-  const executions = computeExecutionDates(mode, SEED_HOPS, schedules);
 
   return (
     <div className="mt-6 grid grid-cols-1 items-start gap-6 xl:grid-cols-[1fr_340px]">
@@ -36,7 +39,7 @@ export default function HopScheduleEditor() {
           <ScheduleModeToggle mode={mode} onModeChange={setMode} />
 
           <div className="mt-4 flex flex-col">
-            {SEED_HOPS.map((hop, i) => {
+            {hops.map((hop, i) => {
               const currentSchedule =
                 schedules.find((s) => s.hopId === hop.id) || {
                   hopId: hop.id,
@@ -83,8 +86,8 @@ export default function HopScheduleEditor() {
 
       {/* Rail Column */}
       <aside className="flex flex-col gap-6" aria-label="Schedule preview and info">
-        <SchedulePreviewCard hops={SEED_HOPS} executions={executions} />
-        <ValidationPanel hops={SEED_HOPS} executions={executions} />
+        <SchedulePreviewCard hops={hops} executions={executions} />
+        <ValidationPanel hops={hops} executions={executions} />
         <HowSchedulingCard />
       </aside>
     </div>

@@ -1,18 +1,21 @@
+'use client';
+
 import React from 'react';
 import {
-  PREVIEW_HOPS,
-  PREVIEW_EXECUTIONS,
   shortWallet,
   formatSol,
-  formatDateTime,
 } from './previewData';
+import { useBuilderRoute } from '@/lib/store';
+import { formatExecutionLabel, formatDateTimeUtc } from '@/lib/route-time';
 
 export default function RouteDetailRows() {
+  const { hops, executions } = useBuilderRoute();
+
   return (
     <section className="grad-border rounded-2xl p-6" aria-label="Route details">
       <div className="flex flex-col">
-        {PREVIEW_HOPS.map((hop, i) => {
-          const isFinal = i === PREVIEW_HOPS.length - 1;
+        {hops.map((hop, i) => {
+          const isFinal = i === hops.length - 1;
 
           return (
             <div
@@ -34,8 +37,13 @@ export default function RouteDetailRows() {
                   {formatSol(hop.amount)} {hop.token}
                 </span>
                 <p className="mt-0.5 text-[13px] text-[#9A9AB0]">
-                  Executes: {formatDateTime(PREVIEW_EXECUTIONS[i])}
+                  Executes: {formatExecutionLabel(executions[i], i === 0)}
                 </p>
+                {i > 0 && executions[i] && (
+                  <p className="mt-0.5 text-[12px] text-[#5A5A6E]">
+                    {formatDateTimeUtc(executions[i])}
+                  </p>
+                )}
               </div>
             </div>
           );

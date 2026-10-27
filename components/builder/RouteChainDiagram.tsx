@@ -1,16 +1,19 @@
+'use client';
+
 import React from 'react';
 import { WalletIcon, ChevronRightIcon } from '@/components/icons';
 import {
   SOURCE_WALLET,
-  PREVIEW_HOPS,
-  PREVIEW_EXECUTIONS,
   shortWallet,
   formatSol,
-  formatDateTime,
-  solTotal,
 } from './previewData';
+import { solTotal } from './builderData';
+import { useBuilderRoute } from '@/lib/store';
+import { formatExecutionLabel } from '@/lib/route-time';
 
 export default function RouteChainDiagram() {
+  const { hops, executions } = useBuilderRoute();
+
   return (
     <section className="grad-border rounded-2xl p-6" aria-label="Route chain">
       <div className="flex flex-wrap items-stretch gap-2">
@@ -22,14 +25,14 @@ export default function RouteChainDiagram() {
           <span className="font-display text-[15px] font-bold text-white">You</span>
           <span className="font-mono text-[13px] text-[#9A9AB0]">{shortWallet(SOURCE_WALLET)}</span>
           <span className="font-display text-[14px] font-bold text-white">
-            {formatSol(solTotal(PREVIEW_HOPS))} SOL
+            {formatSol(solTotal(hops))} SOL
           </span>
           <span className="text-[12px] text-[#9A9AB0]">Source wallet</span>
         </div>
 
         {/* Hops and Connectors */}
-        {PREVIEW_HOPS.map((hop, i) => {
-          const isFinal = i === PREVIEW_HOPS.length - 1;
+        {hops.map((hop, i) => {
+          const isFinal = i === hops.length - 1;
 
           return (
             <React.Fragment key={hop.id}>
@@ -59,7 +62,7 @@ export default function RouteChainDiagram() {
                   {formatSol(hop.amount)} {hop.token}
                 </span>
                 <span className="text-[12px] text-[#9A9AB0]">
-                  {formatDateTime(PREVIEW_EXECUTIONS[i])}
+                  {formatExecutionLabel(executions[i], i === 0)}
                 </span>
               </div>
             </React.Fragment>

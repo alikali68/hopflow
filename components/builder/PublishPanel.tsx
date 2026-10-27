@@ -3,8 +3,10 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useConnection, useWallet } from '@solana/wallet-adapter-react';
 import { WalletMultiButton } from '@solana/wallet-adapter-react-ui';
-import { PREVIEW_HOPS, PREVIEW_EXECUTIONS, SOURCE_WALLET } from './previewData';
+import { SOURCE_WALLET } from './previewData';
 import { validateHops } from './ValidationPanel';
+import { useBuilderRoute } from '@/lib/store';
+import { computeExecutionTimes, buildPublishRoute } from '@/lib/route-time';
 import { signAndSend } from '@/lib/signing';
 import { verifyPreparedBundle } from '@/lib/txverify';
 import {
@@ -51,37 +53,12 @@ function freshSteps(): StepState[] {
   return STEP_LABELS.map((label) => ({ label, status: 'idle' }));
 }
 
-/**
- * The builder's route as one MultiHopper transfer (M1 engine model):
- * the same amount flows through every hop; the last hop is the final
- * recipient; intermediate hops wait between scheduled executions.
- */
-function buildRoute() {
-  const intermediates = PREVIEW_HOPS.slice(0, -1);
-  const recipient = PREVIEW_HOPS[PREVIEW_HOPS.length - 1];
-  if (!recipient) throw new Error('Route needs at least one hop.');
-  const amountSol = String(PREVIEW_HOPS[0].amount);
-  const now = Date.now();
-  const waits = intermediates.map((_, i) => {
-    const exec = PREVIEW_EXECUTIONS[i];
-    if (!exec) throw new Error(`Hop ${i + 1} has no scheduled execution time.`);
-    const prev = i === 0 ? new Date(now) : PREVIEW_EXECUTIONS[i - 1];
-    if (!prev) throw new Error(`Hop ${i + 1} has no previous execution time.`);
-    return Math.floor((exec.getTime() - prev.getTime()) / 1000);
-  });
-  waits.forEach((w, i) => {
-    if (!Number.isInteger(w) || w < 20 || w > 2592000) {
-      throw new Error(
-        `Hop ${i + 1} wait (${w}s) is outside the 20–2,592,000s range — check the schedule.`
-      );
-    }
-  });
-  return { intermediates, recipient, amountSol, waits };
-}
-
 export default function PublishPanel() {
   const { connection } = useConnection();
   const { publicKey, signTransaction, signMessage, connected } = useWallet();
+  // The route being published is the one in the shared store — hops,
+  // schedule, and mode as the user set them on D1/D2 (never the seed data).
+  const { hops, schedules, mode, executions } = useBuilderRoute();
 
   const [mounted, setMounted] = useState(false);
   useEffect(() => {
@@ -130,8 +107,8 @@ export default function PublishPanel() {
   // The publish gate: the same checks the Validation panel shows. The real
   // source is the connected wallet when there is one.
   const issues = validateHops(
-    PREVIEW_HOPS,
-    PREVIEW_EXECUTIONS,
+    hops,
+    executions,
     publicKey?.toBase58() ?? SOURCE_WALLET
   );
   const blockingError = issues.find((i) => i.level === 'error');
@@ -209,12 +186,12 @@ export default function PublishPanel() {
     };
 
     try {
-      // Build the route payload once — same for estimate + create.
-      const route = buildRoute();
-      const routeHops = route.intermediates.map((hop, i) => ({
-        wallet: hop.wallet.trim(),
-        waitSeconds: route.waits[i],
-      }));
+      // Build the route payload once — same for estimate + create. Built
+      // from the store at publish time: hop 0 executes at deploy, so the
+      // waits are computed from the truthful execution times, not the seed.
+      const liveExecutions = computeExecutionTimes(mode, hops, schedules, new Date());
+      const route = buildPublishRoute(hops, liveExecutions);
+      const routeHops = route.routeHops;
 
       // Step 0: Estimate (live, no auth — like the engine test) + Create.
       if (startIndex <= 0) {

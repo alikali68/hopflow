@@ -2,19 +2,25 @@
 
 import React, { useState } from 'react';
 import {
-  SEED_HOPS,
   MAX_HOPS,
   MIN_HOPS,
   HopDraft,
 } from './builderData';
+import { useBuilderRoute } from '@/lib/store';
+import { formatDateTimeTz } from '@/lib/dates';
 import HopRow from './HopRow';
 import RouteSummaryCard from './RouteSummaryCard';
 import ValidationPanel from './ValidationPanel';
 import HowRoutesCard from './HowRoutesCard';
-import { PlusIcon, ChevronRightIcon } from '@/components/icons';
+import { PlusIcon, ChevronRightIcon, CheckCircleIcon } from '@/components/icons';
 
 export default function HopEditor() {
-  const [hops, setHops] = useState<HopDraft[]>(SEED_HOPS);
+  const { hops, draftSavedAt, draftSavedVersion, builderVersion, dispatch } =
+    useBuilderRoute();
+  const setHops = (next: HopDraft[]) =>
+    dispatch({ type: 'builder/setHops', hops: next });
+  const draftSaved =
+    draftSavedAt !== null && draftSavedVersion === builderVersion;
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
   const [dropIndex, setDropIndex] = useState<number | null>(null);
 
@@ -38,13 +44,11 @@ export default function HopEditor() {
       setDropIndex(null);
       return;
     }
-    setHops((prev) => {
-      const next = [...prev];
-      const [moved] = next.splice(draggedIndex, 1);
-      const insertAt = draggedIndex < target ? target - 1 : target;
-      next.splice(insertAt, 0, moved);
-      return next;
-    });
+    const next = [...hops];
+    const [moved] = next.splice(draggedIndex, 1);
+    const insertAt = draggedIndex < target ? target - 1 : target;
+    next.splice(insertAt, 0, moved);
+    setHops(next);
     setDraggedIndex(null);
     setDropIndex(null);
   };
@@ -55,7 +59,7 @@ export default function HopEditor() {
   };
 
   const updateHop = (id: string, patch: Partial<HopDraft>) => {
-    setHops((prev) => prev.map((h) => (h.id === id ? { ...h, ...patch } : h)));
+    setHops(hops.map((h) => (h.id === id ? { ...h, ...patch } : h)));
   };
 
   const duplicateHop = (id: string) => {
@@ -74,7 +78,7 @@ export default function HopEditor() {
 
   const removeHop = (id: string) => {
     if (hops.length <= MIN_HOPS) return;
-    setHops((prev) => prev.filter((h) => h.id !== id));
+    setHops(hops.filter((h) => h.id !== id));
   };
 
   const addHop = () => {
@@ -85,7 +89,7 @@ export default function HopEditor() {
       amount: 0.1,
       token: 'SOL',
     };
-    setHops((prev) => [...prev, newHop]);
+    setHops([...hops, newHop]);
   };
 
   return (
@@ -157,12 +161,22 @@ export default function HopEditor() {
 
         {/* Continue & Draft Row */}
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <a
-            href="#"
-            className="text-[13.5px] font-semibold text-[#9A9AB0] transition-colors hover:text-white"
-          >
-            Save as draft
-          </a>
+          {draftSaved && draftSavedAt ? (
+            <span className="inline-flex items-center gap-1.5 text-[13.5px] font-semibold text-[#14F195]">
+              <CheckCircleIcon size={15} />
+              <span>
+                Draft saved · {formatDateTimeTz(new Date(draftSavedAt))}
+              </span>
+            </span>
+          ) : (
+            <button
+              type="button"
+              onClick={() => dispatch({ type: 'builder/saveDraft' })}
+              className="text-[13.5px] font-semibold text-[#9A9AB0] transition-colors hover:text-white"
+            >
+              Save as draft
+            </button>
+          )}
 
           <a
             href="/builder/schedule"

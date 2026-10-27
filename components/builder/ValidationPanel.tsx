@@ -73,10 +73,31 @@ export function validateHops(
   if (executions) {
     const now = new Date();
     executions.forEach((d, i) => {
-      if (d && d.getTime() < now.getTime()) {
+      // Hop 0 executes at deploy by definition — it is never "in the past".
+      if (i === 0 || !d) return;
+      if (d.getTime() < now.getTime()) {
         issues.push({ level: 'error', message: `Hop ${i + 1}: execution time is in the past.` });
       }
     });
+    // The protocol waits 20s–30d between hops (server validation) — flag a
+    // schedule that could never publish.
+    for (let i = 1; i < executions.length; i++) {
+      const prev = executions[i - 1];
+      const curr = executions[i];
+      if (!prev || !curr) continue;
+      const gapSeconds = (curr.getTime() - prev.getTime()) / 1000;
+      if (gapSeconds < 20) {
+        issues.push({
+          level: 'error',
+          message: `Hop ${i + 1} must execute at least 20 seconds after hop ${i}.`,
+        });
+      } else if (gapSeconds > 2592000) {
+        issues.push({
+          level: 'error',
+          message: `Hop ${i + 1} is more than 30 days after hop ${i}.`,
+        });
+      }
+    }
   }
   return issues;
 }

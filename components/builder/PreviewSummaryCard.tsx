@@ -1,20 +1,22 @@
+'use client';
+
 import React from 'react';
 import {
-  PREVIEW_HOPS,
-  PREVIEW_EXECUTIONS,
   solTotal,
   usdcTotal,
   estimatedFeeSol,
   formatSol,
   formatFeeSol,
-  formatDateTime,
-} from './previewData';
+} from './builderData';
+import { useBuilderRoute } from '@/lib/store';
+import { formatDateTimeTz, formatDateTimeUtc } from '@/lib/route-time';
 
 export default function PreviewSummaryCard() {
-  const currentSol = solTotal(PREVIEW_HOPS);
-  const currentUsdc = usdcTotal(PREVIEW_HOPS);
+  const { hops, executions } = useBuilderRoute();
+  const currentSol = solTotal(hops);
+  const currentUsdc = usdcTotal(hops);
   const currentFee = estimatedFeeSol(currentSol);
-  const lastExecution = PREVIEW_EXECUTIONS[PREVIEW_EXECUTIONS.length - 1];
+  const lastExecution = executions[executions.length - 1];
 
   return (
     <div className="glass-panel rounded-2xl p-5">
@@ -44,7 +46,7 @@ export default function PreviewSummaryCard() {
         <div className="flex items-center justify-between border-b border-white/[0.06] py-2.5">
           <span className="text-[13.5px] text-[#9A9AB0]">Hops</span>
           <span className="font-display text-[14px] font-bold text-white">
-            {PREVIEW_HOPS.length}
+            {hops.length}
           </span>
         </div>
 
@@ -57,10 +59,15 @@ export default function PreviewSummaryCard() {
           </div>
         )}
 
-        <div className="flex items-center justify-between py-2.5 pb-0">
+        <div className="flex items-start justify-between gap-3 py-2.5 pb-0">
           <span className="text-[13.5px] text-[#9A9AB0]">Route completes</span>
-          <span className="font-display text-[14px] font-bold text-white">
-            {formatDateTime(lastExecution)}
+          <span className="text-right">
+            <span className="block font-display text-[14px] font-bold text-white">
+              {formatDateTimeTz(lastExecution)}
+            </span>
+            <span className="mt-0.5 block text-[12px] font-medium text-[#5A5A6E]">
+              {formatDateTimeUtc(lastExecution)}
+            </span>
           </span>
         </div>
       </div>

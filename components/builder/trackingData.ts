@@ -1,4 +1,5 @@
-import { PREVIEW_HOPS, PREVIEW_EXECUTIONS, SOURCE_WALLET, shortWallet, formatSol, formatDateTime } from './previewData';
+import { PREVIEW_HOPS, SOURCE_WALLET, shortWallet, formatSol, formatDateTime } from './previewData';
+import { SEED_SCHEDULES, combineDateTime } from './scheduleData';
 import type { Transfer } from '@/lib/multihopper';
 
 export interface ApiRouteHop {
@@ -57,6 +58,8 @@ export function statusPillClass(tone: 'green' | 'purple' | 'red' | 'amber'): str
 }
 
 // Demo route — the builder's seed route, NOT published yet. Shown only for id 'rt-1'.
+// Its hop dates are the illustrative seed dates (Nov 1/2/3) — a demo, not a
+// published route's executions (a real route's hop 0 runs at deploy).
 export const DEMO_ROUTE_ID = 'rt-1';
 export interface DemoHop {
   address: string;
@@ -68,7 +71,13 @@ export const DEMO_ROUTE = {
   sourceOwner: SOURCE_WALLET,
   amountTokens: PREVIEW_HOPS[0]?.amount ?? 0.1,
   tokenSymbol: 'SOL',
-  hops: PREVIEW_HOPS.map((h, i) => ({ address: h.wallet, scheduledAt: PREVIEW_EXECUTIONS[i] ?? null }) as DemoHop),
+  hops: PREVIEW_HOPS.map((h, i) => {
+    const seed = SEED_SCHEDULES[i];
+    return {
+      address: h.wallet,
+      scheduledAt: seed ? combineDateTime(seed.date, seed.time) : null,
+    } as DemoHop;
+  }),
 };
 
 export { shortWallet, formatSol, formatDateTime };

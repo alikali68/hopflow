@@ -8,6 +8,7 @@ import {
   explorerTxUrl,
   formatTxShort,
 } from './trackingData';
+import { formatDateTimeUtc } from '@/lib/dates';
 import { CheckCircleIcon, ClockIcon, ArrowUpRightIcon } from '@/components/icons';
 
 interface RouteTimelineProps {
@@ -70,7 +71,19 @@ export default function RouteTimeline({
                 <div className="mt-1 flex flex-wrap items-center justify-between gap-2">
                   <div className="flex flex-col gap-0.5 text-[13px] text-[#9A9AB0]">
                     <span>Scheduled: {sched ? formatDateTime(sched) : '—'}</span>
-                    {executed && <span>Executed: {formatDateTime(executed)}</span>}
+                    {sched && (
+                      <span className="text-[12px] text-[#5A5A6E]">
+                        {formatDateTimeUtc(sched)}
+                      </span>
+                    )}
+                    {executed && (
+                      <span>Executed: {formatDateTime(executed)}</span>
+                    )}
+                    {executed && (
+                      <span className="text-[12px] text-[#5A5A6E]">
+                        {formatDateTimeUtc(executed)}
+                      </span>
+                    )}
                   </div>
 
                   <div className="flex flex-col items-end gap-1.5">

@@ -1,3 +1,5 @@
+'use client';
+
 import React from 'react';
 import AppShell from '@/components/app/AppShell';
 import RouteChainDiagram from '@/components/builder/RouteChainDiagram';
@@ -5,10 +7,11 @@ import RouteDetailRows from '@/components/builder/RouteDetailRows';
 import PublishPanel from '@/components/builder/PublishPanel';
 import PreviewSummaryCard from '@/components/builder/PreviewSummaryCard';
 import ValidationPanel from '@/components/builder/ValidationPanel';
-import { PREVIEW_HOPS, PREVIEW_EXECUTIONS } from '@/components/builder/previewData';
+import { useBuilderRoute } from '@/lib/store';
 import { ArrowLeftIcon } from '@/components/icons';
 
 export default function ReviewRoutePage() {
+  const { hops, executions } = useBuilderRoute();
   return (
     <AppShell active="Route Builder">
       {/* Navigation & Header */}
@@ -38,7 +41,7 @@ export default function ReviewRoutePage() {
 
         <aside className="flex flex-col gap-6" aria-label="Summary and validation">
           <PreviewSummaryCard />
-          <ValidationPanel hops={PREVIEW_HOPS} executions={PREVIEW_EXECUTIONS} />
+          <ValidationPanel hops={hops} executions={executions} />
         </aside>
       </div>
     </AppShell>
