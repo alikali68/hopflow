@@ -11,6 +11,7 @@ import {
 import ScheduleModeToggle from './ScheduleModeToggle';
 import HopScheduleRow from './HopScheduleRow';
 import SchedulePreviewCard from './SchedulePreviewCard';
+import ValidationPanel from './ValidationPanel';
 import HowSchedulingCard from './HowSchedulingCard';
 import { ArrowLeftIcon, ChevronRightIcon } from '@/components/icons';
 
@@ -83,6 +84,7 @@ export default function HopScheduleEditor() {
       {/* Rail Column */}
       <aside className="flex flex-col gap-6" aria-label="Schedule preview and info">
         <SchedulePreviewCard hops={SEED_HOPS} executions={executions} />
+        <ValidationPanel hops={SEED_HOPS} executions={executions} />
         <HowSchedulingCard />
       </aside>
     </div>

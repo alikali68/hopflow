@@ -9,6 +9,7 @@ import {
 } from './builderData';
 import HopRow from './HopRow';
 import RouteSummaryCard from './RouteSummaryCard';
+import ValidationPanel from './ValidationPanel';
 import HowRoutesCard from './HowRoutesCard';
 import { PlusIcon, ChevronRightIcon } from '@/components/icons';
 
@@ -176,6 +177,7 @@ export default function HopEditor() {
       {/* Rail Column */}
       <aside className="flex flex-col gap-6" aria-label="Route summary and info">
         <RouteSummaryCard hops={hops} />
+        <ValidationPanel hops={hops} />
         <HowRoutesCard />
       </aside>
     </div>
