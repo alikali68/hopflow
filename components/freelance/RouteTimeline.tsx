@@ -1,14 +1,20 @@
+// components/freelance/RouteTimeline.tsx
 import React from 'react';
 import { LockIcon, WalletIcon } from '../icons';
 import {
-  REVIEW_HOPS,
-  REVIEW_PROJECT,
-  TOTAL_TO_FUND,
+  type FreelanceDraft,
   fmt0,
   fmt2,
-} from './reviewData';
+  shortWallet,
+  protocolFee,
+} from '@/lib/freelance';
+import { parseShortDate } from '@/lib/dates';
+import { formatShortDateTz } from '@/lib/dates';
 
-export default function RouteTimeline() {
+export default function RouteTimeline({ draft }: { draft: FreelanceDraft }) {
+  const total = parseFloat(draft.amount) || 0;
+  const totalToFund = total + protocolFee(total);
+
   return (
     <div className="relative">
       <div
@@ -28,36 +34,40 @@ export default function RouteTimeline() {
             <div className="flex flex-col">
               <span className="text-[15px] font-semibold text-white">Vault</span>
               <span className="text-[12.5px] text-[#9A9AB0]">
-                Funds locked on sign
+                Funds locked on create
               </span>
             </div>
             <span className="font-display text-[15px] font-bold text-white">
-              {fmt2(TOTAL_TO_FUND)} USDC
+              {fmt2(totalToFund)} {draft.token}
             </span>
           </div>
         </div>
 
-        {REVIEW_HOPS.map((hop) => (
-          <div key={hop.n} className="flex items-center gap-4 py-3">
-            <div className="relative z-10 flex w-[28px] shrink-0 justify-center">
-              <span className="h-3 w-3 rounded-full bg-gradient-to-br from-[#9945FF] to-[#14F195] shadow-[0_0_10px_rgba(20,241,149,0.6)]" />
-            </div>
+        {draft.milestones.map((hop, i) => {
+          const due = parseShortDate(hop.due);
+          return (
+            <div key={hop.id} className="flex items-center gap-4 py-3">
+              <div className="relative z-10 flex w-[28px] shrink-0 justify-center">
+                <span className="h-3 w-3 rounded-full bg-gradient-to-br from-[#9945FF] to-[#14F195] shadow-[0_0_10px_rgba(20,241,149,0.6)]" />
+              </div>
 
-            <div className="flex flex-1 flex-col">
-              <div className="flex items-baseline gap-2">
-                <span className="bg-gradient-to-r from-[#9945FF] to-[#14F195] bg-clip-text text-[11px] font-bold tracking-wide text-transparent">
-                  HOP {hop.n}
-                </span>
-                <span className="text-[15px] font-semibold text-white">
-                  {hop.title}
+              <div className="flex flex-1 flex-col">
+                <div className="flex items-baseline gap-2">
+                  <span className="bg-gradient-to-r from-[#9945FF] to-[#14F195] bg-clip-text text-[11px] font-bold tracking-wide text-transparent">
+                    HOP {i + 1}
+                  </span>
+                  <span className="text-[15px] font-semibold text-white">
+                    {hop.title.trim() || 'Untitled milestone'}
+                  </span>
+                </div>
+                <span className="mt-0.5 text-[12.5px] text-[#9A9AB0]">
+                  {fmt0(parseFloat(hop.amount) || 0)} {draft.token} ·{' '}
+                  {due ? formatShortDateTz(due) : 'No date'}
                 </span>
               </div>
-              <span className="mt-0.5 text-[12.5px] text-[#9A9AB0]">
-                {fmt0(hop.amount)} USDC · {hop.date}
-              </span>
             </div>
-          </div>
-        ))}
+          );
+        })}
 
         <div className="flex items-center gap-4 py-3 pb-1">
           <div className="relative z-10 flex w-[28px] shrink-0 justify-center">
@@ -71,7 +81,7 @@ export default function RouteTimeline() {
               Freelancer wallet
             </span>
             <span className="font-mono text-[12.5px] text-[#9A9AB0]">
-              {REVIEW_PROJECT.freelancerShort}
+              {shortWallet(draft.freelancerWallet)}
             </span>
           </div>
         </div>

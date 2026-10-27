@@ -1,17 +1,47 @@
+// components/freelance/SignPanel.tsx
 'use client';
 
 import React, { useState } from 'react';
-import { ArrowLeftIcon, CheckCircleIcon, LockIcon } from '../icons';
+import { ArrowLeftIcon, CheckCircleIcon, LockIcon, WalletIcon } from '../icons';
+import { type FreelanceDraft, fmt0, protocolFee } from '@/lib/freelance';
+import { useStore } from '@/lib/store';
+import { useWalletModal } from '@solana/wallet-adapter-react-ui';
+import { isValidSolanaAddress } from '../payroll/addMembersData';
 
-export default function SignPanel() {
-  const [status, setStatus] = useState<'idle' | 'signing' | 'done'>('idle');
+interface SignPanelProps {
+  draft: FreelanceDraft;
+  /** The funding token's real wallet balance (null when unknown). */
+  balance: number | null;
+  walletConnected: boolean;
+}
 
-  const handleSign = () => {
-    if (status !== 'idle') return;
-    setStatus('signing');
-    setTimeout(() => {
-      setStatus('done');
-    }, 1400);
+export default function SignPanel({ draft, balance, walletConnected }: SignPanelProps) {
+  const { state, dispatch } = useStore();
+  const { setVisible } = useWalletModal();
+  const [done, setDone] = useState(false);
+
+  const total = parseFloat(draft.amount) || 0;
+  const totalToFund = total + protocolFee(total);
+  const allocated = draft.milestones.reduce((sum, m) => sum + (parseFloat(m.amount) || 0), 0);
+  const validDraft =
+    draft.title.trim().length > 0 &&
+    isValidSolanaAddress(draft.freelancerWallet.trim()) &&
+    total > 0 &&
+    draft.milestones.length > 0 &&
+    Math.abs(allocated - total) < 0.01 &&
+    draft.milestones.every((m) => m.title.trim().length > 0 && m.due.trim().length > 0);
+
+  // Demo mode explores without a wallet — the balance gate only applies to
+  // the real entry path.
+  const insufficient =
+    !state.demoMode && walletConnected && balance !== null && balance < totalToFund;
+
+  const handleCreate = () => {
+    if (!validDraft || insufficient || done) return;
+    // Creates the escrow RECORD in the app store — no on-chain route is
+    // created in this beta, so nothing here claims one.
+    dispatch({ type: 'freelance/createProject' });
+    setDone(true);
   };
 
   return (
@@ -25,45 +55,59 @@ export default function SignPanel() {
           <span>Back</span>
         </a>
 
-        {status === 'idle' && (
-          <button
-            type="button"
-            onClick={handleSign}
-            className="flex h-[46px] items-center gap-2 rounded-xl bg-gradient-to-r from-[#9945FF] to-[#14F195] px-6 text-[14.5px] font-bold text-white shadow-[0_0_24px_rgba(153,69,255,0.4)] transition hover:brightness-110 active:scale-[0.99]"
-          >
-            <LockIcon size={16} />
-            <span>Sign & Create Route</span>
-          </button>
-        )}
-
-        {status === 'signing' && (
-          <button
-            type="button"
-            disabled
-            className="flex h-[46px] cursor-not-allowed items-center gap-2.5 rounded-xl bg-gradient-to-r from-[#9945FF] to-[#14F195] px-6 text-[14.5px] font-bold text-white opacity-90 shadow-[0_0_24px_rgba(153,69,255,0.4)]"
-          >
-            <span
-              className="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white"
-              aria-hidden="true"
-            />
-            <span>Signing…</span>
-          </button>
-        )}
-
-        {status === 'done' && (
+        {done ? (
           <a
             href="/freelance"
             className="flex h-[46px] items-center gap-2 rounded-xl bg-gradient-to-r from-[#9945FF] to-[#14F195] px-6 text-[14.5px] font-bold text-white shadow-[0_0_24px_rgba(20,241,149,0.4)] transition hover:brightness-110 active:scale-[0.99]"
           >
             <CheckCircleIcon size={17} />
-            <span>Route created — View projects</span>
+            <span>Escrow created — View projects</span>
           </a>
+        ) : !validDraft ? (
+          <button
+            type="button"
+            disabled
+            className="flex h-[46px] cursor-not-allowed items-center gap-2 rounded-xl bg-gradient-to-r from-[#9945FF] to-[#14F195] px-6 text-[14.5px] font-bold text-white opacity-40"
+          >
+            <LockIcon size={16} />
+            <span>Create Escrow</span>
+          </button>
+        ) : insufficient ? (
+          <button
+            type="button"
+            disabled
+            className="flex h-[46px] cursor-not-allowed items-center gap-2 rounded-xl bg-gradient-to-r from-[#9945FF] to-[#14F195] px-6 text-[14.5px] font-bold text-white opacity-40"
+          >
+            <LockIcon size={16} />
+            <span>Insufficient {draft.token} balance</span>
+          </button>
+        ) : !state.demoMode && !walletConnected ? (
+          <button
+            type="button"
+            onClick={() => setVisible(true)}
+            className="flex h-[46px] items-center gap-2 rounded-xl bg-gradient-to-r from-[#9945FF] to-[#14F195] px-6 text-[14.5px] font-bold text-white shadow-[0_0_24px_rgba(153,69,255,0.4)] transition hover:brightness-110 active:scale-[0.99]"
+          >
+            <WalletIcon size={16} />
+            <span>Connect Wallet to Create</span>
+          </button>
+        ) : (
+          <button
+            type="button"
+            onClick={handleCreate}
+            className="flex h-[46px] items-center gap-2 rounded-xl bg-gradient-to-r from-[#9945FF] to-[#14F195] px-6 text-[14.5px] font-bold text-white shadow-[0_0_24px_rgba(153,69,255,0.4)] transition hover:brightness-110 active:scale-[0.99]"
+          >
+            <LockIcon size={16} />
+            <span>Create Escrow</span>
+          </button>
         )}
       </div>
 
       <p className="mt-3 text-center text-[12px] text-[#5C5C72]">
-        Signing creates the route on Solana Devnet. You can cancel anytime before
-        the first release.
+        {!validDraft
+          ? 'Complete the project and milestones first — milestones must add up to the total.'
+          : insufficient
+            ? `Wallet balance ${fmt0(balance ?? 0)} ${draft.token} is below the ${fmt0(totalToFund)} ${draft.token} needed to fund this escrow.`
+            : 'Creates the escrow record in the app — sample escrow, no on-chain route is created in this beta. You can cancel anytime before the first release.'}
       </p>
     </div>
   );

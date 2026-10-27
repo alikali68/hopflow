@@ -1,3 +1,6 @@
+// app/freelance/create/review/page.tsx
+'use client';
+
 import React from 'react';
 import AppShell from '@/components/app/AppShell';
 import WizardSteps from '@/components/app/WizardSteps';
@@ -6,15 +9,17 @@ import FeeBreakdown from '@/components/freelance/FeeBreakdown';
 import RouteSummaryCard from '@/components/freelance/RouteSummaryCard';
 import WhatHappensCard from '@/components/freelance/WhatHappensCard';
 import SignPanel from '@/components/freelance/SignPanel';
-import {
-  REVIEW_PROJECT,
-  REVIEW_TOTAL,
-  REVIEW_TOKEN,
-  fmt0,
-} from '@/components/freelance/reviewData';
+import { useFreelance } from '@/lib/store';
+import { useWalletBalances } from '@/lib/use-wallet-balance';
+import { fmt0, shortWallet } from '@/lib/freelance';
 import { ArrowLeftIcon, NodesIcon } from '@/components/icons';
 
 export default function ReviewAndFundPage() {
+  const { draft } = useFreelance();
+  const balances = useWalletBalances();
+  const total = parseFloat(draft.amount) || 0;
+  const balance = draft.token === 'USDC' ? balances.usdc : balances.sol;
+
   return (
     <AppShell active="Freelance Escrow">
       <div className="mx-auto w-full max-w-[1060px] px-8 py-7">
@@ -30,7 +35,7 @@ export default function ReviewAndFundPage() {
           Review & Fund
         </h1>
         <p className="mt-1.5 text-[14px] text-[#9A9AB0]">
-          Check the route, fees and schedule — then sign once to create it.
+          Check the route, fees and schedule — then create the escrow record.
         </p>
 
         <div className="mt-6">
@@ -41,10 +46,10 @@ export default function ReviewAndFundPage() {
         </div>
 
         <p className="grad-border-soft mt-5 rounded-full px-5 py-2.5 text-center text-[13.5px] text-[#B8B8C7]">
-          {REVIEW_PROJECT.title} · Freelancer {REVIEW_PROJECT.freelancerShort} ·
-          Total{' '}
+          {draft.title.trim() || 'Untitled project'} · Freelancer{' '}
+          <span className="font-mono text-white">{shortWallet(draft.freelancerWallet)}</span> · Total{' '}
           <span className="font-semibold text-white">
-            {fmt0(REVIEW_TOTAL)} {REVIEW_TOKEN}
+            {fmt0(total)} {draft.token}
           </span>
         </p>
 
@@ -73,21 +78,30 @@ export default function ReviewAndFundPage() {
               </div>
 
               <div className="mt-2">
-                <RouteTimeline />
+                <RouteTimeline draft={draft} />
               </div>
 
               <div className="my-5 border-t border-white/10" />
 
-              <FeeBreakdown />
+              <FeeBreakdown
+                draft={draft}
+                balance={balance}
+                balanceFailed={balances.failed}
+                walletConnected={balances.connected}
+              />
 
               <div className="mt-6">
-                <SignPanel />
+                <SignPanel
+                  draft={draft}
+                  balance={balance}
+                  walletConnected={balances.connected}
+                />
               </div>
             </div>
           </section>
 
           <aside className="flex flex-col gap-5">
-            <RouteSummaryCard />
+            <RouteSummaryCard draft={draft} />
             <WhatHappensCard />
           </aside>
         </div>

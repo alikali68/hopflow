@@ -1,10 +1,7 @@
 import React from 'react';
-import {
-  ESCROW_PROJECTS_CLIENT,
-  ESCROW_PROJECTS_FREELANCER,
-  type StatItem,
-} from './data';
+import { type StatItem } from './data';
 import { seedStoreRoutes, computeRouteStats } from '@/lib/routes';
+import { seedFreelanceProjects } from '@/lib/freelance';
 import { TrendArrowIcon } from './icons';
 
 // Honest stats: derived from the app's own seed data, NOT live platform
@@ -30,7 +27,7 @@ const STATS: StatItem[] = [
     hasTrend: false,
   },
   {
-    value: String(ESCROW_PROJECTS_CLIENT.length + ESCROW_PROJECTS_FREELANCER.length),
+    value: String(seedFreelanceProjects().length),
     label: 'Escrow projects',
     isGradient: false,
     hasTrend: true,

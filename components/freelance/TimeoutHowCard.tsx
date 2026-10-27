@@ -1,8 +1,12 @@
 // components/freelance/TimeoutHowCard.tsx
 import React from 'react';
-import { TIMEOUT_STEPS } from './endOptionsData';
+import { type FreelanceProject, fmt0, releasedAmountOf } from '@/lib/freelance';
 
-export default function TimeoutHowCard() {
+const TIMEOUT_STEPS = ['Deadline passes', 'Claim refund', 'Funds return to wallet'];
+
+export default function TimeoutHowCard({ project }: { project: FreelanceProject }) {
+  const released = releasedAmountOf(project);
+
   return (
     <section className="grad-border rounded-2xl p-5" aria-label="How timeout works">
       <h2 className="font-display text-[16px] font-bold text-white">
@@ -31,7 +35,7 @@ export default function TimeoutHowCard() {
 
       {/* Footnote */}
       <p className="mt-4 text-[12px] text-[#5C5C72]">
-        * Released funds (1,500 USDC) cannot be refunded.
+        * Released funds ({fmt0(released)} {project.token}) cannot be refunded.
       </p>
     </section>
   );

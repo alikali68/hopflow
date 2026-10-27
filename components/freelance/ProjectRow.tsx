@@ -1,5 +1,5 @@
 import React from 'react';
-import { EscrowProject } from '../data';
+import { type EscrowProject } from '@/lib/freelance';
 import { HandshakeIcon } from '../icons';
 
 const CHIP: Record<EscrowProject['status'], string> = {
@@ -84,12 +84,12 @@ export default function ProjectRow({
         </div>
 
         {project.status === 'Awaiting Approval' && role === 'client' && (
-          <button
-            type="button"
-            className="mt-2 h-[30px] rounded-lg bg-gradient-to-r from-[#9945FF] to-[#14F195] px-3 text-[12px] font-bold text-white shadow-sm transition-all hover:brightness-110 active:scale-95"
+          <a
+            href={`/freelance/${project.id}#review`}
+            className="mt-2 flex h-[30px] items-center rounded-lg bg-gradient-to-r from-[#9945FF] to-[#14F195] px-3 text-[12px] font-bold text-white shadow-sm transition-all hover:brightness-110 active:scale-95"
           >
             Review
-          </button>
+          </a>
         )}
       </div>
     </div>

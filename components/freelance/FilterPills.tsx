@@ -1,5 +1,5 @@
 import React from 'react';
-import { EscrowProject } from '../data';
+import { type EscrowProject } from '@/lib/freelance';
 
 export type FilterOption = 'All' | EscrowProject['status'];
 

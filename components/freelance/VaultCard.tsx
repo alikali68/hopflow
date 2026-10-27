@@ -1,9 +1,18 @@
 // components/freelance/VaultCard.tsx
 import React from 'react';
 import { NodesIcon } from '../icons';
-import { VAULT, TOKEN, fmt0 } from './projectDetailData';
+import {
+  type FreelanceProject,
+  fmt0,
+  releasedAmountOf,
+  inVaultOf,
+} from '@/lib/freelance';
 
-export default function VaultCard() {
+export default function VaultCard({ project }: { project: FreelanceProject }) {
+  const released = releasedAmountOf(project);
+  const inVault = inVaultOf(project);
+  const fundedPct = project.totalAmount > 0 ? Math.round((inVault / project.totalAmount) * 100) : 0;
+
   return (
     <section className="grad-border rounded-2xl p-5" aria-label="Vault">
       {/* Header */}
@@ -18,7 +27,7 @@ export default function VaultCard() {
 
       {/* Main Vault Value */}
       <p className="font-display mt-3 text-[30px] font-bold leading-none text-white">
-        {fmt0(VAULT.inVault)} {TOKEN}
+        {fmt0(inVault)} {project.token}
       </p>
 
       {/* In Vault Chip */}
@@ -33,28 +42,28 @@ export default function VaultCard() {
         <div className="flex items-center justify-between border-b border-white/5 py-2.5">
           <span className="text-[13px] text-[#9A9AB0]">Released</span>
           <span className="font-display text-[14.5px] font-bold text-white">
-            {fmt0(VAULT.released)} {TOKEN}
+            {fmt0(released)} {project.token}
           </span>
         </div>
 
         <div className="flex items-center justify-between py-2.5">
           <span className="text-[13px] text-[#9A9AB0]">Total funded</span>
           <span className="font-display text-[14.5px] font-bold text-white">
-            {fmt0(VAULT.totalFunded)} {TOKEN}
+            {fmt0(project.totalAmount)} {project.token}
           </span>
         </div>
       </div>
 
       {/* Progress Bar */}
       <div className="mt-3">
-        <div className="h-1.5 w-full rounded-full bg-white/[0.08]" role="progressbar" aria-valuenow={VAULT.fundedPct} aria-valuemin={0} aria-valuemax={100}>
+        <div className="h-1.5 w-full rounded-full bg-white/[0.08]" role="progressbar" aria-valuenow={fundedPct} aria-valuemin={0} aria-valuemax={100}>
           <div
             className="h-full rounded-full bg-gradient-to-r from-[#9945FF] to-[#14F195] shadow-[0_0_10px_rgba(20,241,149,0.5)]"
-            style={{ width: `${VAULT.fundedPct}%` }}
+            style={{ width: `${fundedPct}%` }}
           />
         </div>
         <p className="mt-2 text-[12.5px] text-[#9A9AB0]">
-          {VAULT.fundedPct}% funded
+          {fundedPct}% funded
         </p>
       </div>
     </section>

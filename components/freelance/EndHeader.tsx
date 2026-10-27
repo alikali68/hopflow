@@ -1,14 +1,22 @@
 // components/freelance/EndHeader.tsx
 import React from 'react';
 import { ArrowLeftIcon } from '../icons';
-import { PROJECT } from './endOptionsData';
+import {
+  type FreelanceProject,
+  fmt0,
+  milestonesDoneOf,
+} from '@/lib/freelance';
+import { formatShortDateTz } from '@/lib/dates';
 
-export default function EndHeader({ projectId }: { projectId: string }) {
+export default function EndHeader({ project }: { project: FreelanceProject }) {
+  const done = milestonesDoneOf(project);
+  const total = project.milestones.length;
+
   return (
     <div>
       {/* Back Link */}
       <a
-        href={`/freelance/${projectId}`}
+        href={`/freelance/${project.id}`}
         className="inline-flex items-center gap-1.5 text-[13px] font-medium text-[#9A9AB0] transition-colors hover:text-white"
       >
         <ArrowLeftIcon size={15} />
@@ -28,7 +36,9 @@ export default function EndHeader({ projectId }: { projectId: string }) {
 
       {/* Sub-caption Metadata */}
       <p className="mt-1.5 text-[14px] text-[#9A9AB0]">
-        {PROJECT.title} · Freelancer: {PROJECT.freelancer} · Created {PROJECT.created}
+        {project.title} · {project.role === 'client' ? 'Freelancer' : 'Client'}:{' '}
+        {project.counterpartyName} · Created {formatShortDateTz(new Date(project.createdAt))} ·{' '}
+        {done} of {total} milestones released · {fmt0(project.totalAmount)} {project.token} total
       </p>
     </div>
   );

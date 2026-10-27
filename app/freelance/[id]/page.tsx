@@ -1,24 +1,58 @@
 // app/freelance/[id]/page.tsx
-import React from 'react';
+'use client';
+
+import React, { useEffect } from 'react';
 import AppShell from '@/components/app/AppShell';
 import ProjectHeader from '@/components/freelance/ProjectHeader';
 import ProjectMilestoneRow from '@/components/freelance/ProjectMilestoneRow';
 import VaultCard from '@/components/freelance/VaultCard';
 import ActivityCard from '@/components/freelance/ActivityCard';
-import { MILESTONES } from '@/components/freelance/projectDetailData';
+import { useFreelance } from '@/lib/store';
 import { CheckCircleIcon } from '@/components/icons';
 
-export default async function ProjectDetailPage({
+export default function ProjectDetailPage({
   params,
 }: {
   params: Promise<{ id: string }>;
 }) {
-  await params;
+  const { id } = React.use(params);
+  const { projects } = useFreelance();
+  const project = projects.find((p) => p.id === id);
+
+  // Review links land here as /freelance/<id>#review — scroll to the
+  // delivered milestone's approval box after mount.
+  useEffect(() => {
+    if (window.location.hash === '#review') {
+      const el = document.getElementById('review');
+      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+  }, [id, project?.id]);
+
+  if (!project) {
+    return (
+      <AppShell active="Freelance Escrow">
+        <div className="mx-auto w-full max-w-[1060px] px-8 py-7">
+          <div className="glass-panel rounded-2xl p-8 text-center">
+            <h1 className="font-display text-[24px] font-bold text-white">Project not found</h1>
+            <p className="mt-2 text-[14px] text-[#9A9AB0]">
+              No escrow project with the id “{id}” exists.
+            </p>
+            <a
+              href="/freelance"
+              className="mt-5 inline-flex h-[44px] items-center rounded-xl bg-gradient-to-r from-[#9945FF] to-[#14F195] px-5 text-[14px] font-bold text-white transition hover:brightness-110"
+            >
+              Back to projects
+            </a>
+          </div>
+        </div>
+      </AppShell>
+    );
+  }
 
   return (
     <AppShell active="Freelance Escrow">
       <div className="mx-auto w-full max-w-[1060px] px-8 py-7">
-        <ProjectHeader />
+        <ProjectHeader project={project} />
 
         <div className="mt-6 grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1fr)_320px]">
           {/* Main Milestones Section */}
@@ -46,8 +80,8 @@ export default async function ProjectDetailPage({
               </div>
 
               <div className="mt-2">
-                {MILESTONES.map((m) => (
-                  <ProjectMilestoneRow key={m.n} milestone={m} />
+                {project.milestones.map((m) => (
+                  <ProjectMilestoneRow key={m.n} milestone={m} project={project} />
                 ))}
               </div>
             </div>
@@ -55,8 +89,8 @@ export default async function ProjectDetailPage({
 
           {/* Right Rail Info Cards */}
           <aside className="flex flex-col gap-5">
-            <VaultCard />
-            <ActivityCard />
+            <VaultCard project={project} />
+            <ActivityCard project={project} />
           </aside>
         </div>
       </div>

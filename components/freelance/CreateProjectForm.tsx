@@ -1,8 +1,13 @@
+// components/freelance/CreateProjectForm.tsx
 'use client';
 
-import React, { useState } from 'react';
+import React from 'react';
 import { CheckCircleIcon, ChevronRightIcon } from '../icons';
 import { isValidSolanaAddress } from '../payroll/addMembersData';
+import { useFreelance } from '@/lib/store';
+import { useWalletBalances } from '@/lib/use-wallet-balance';
+import { fmt2 } from '@/lib/freelance';
+import { formatShortDateTz } from '@/lib/dates';
 
 const INPUT_BASE =
   'w-full rounded-xl border border-[#262637] bg-white/[0.02] px-4 text-[15px] text-white placeholder-[#5C5C72] outline-none transition-colors focus:border-[#9945FF]/60 focus:ring-2 focus:ring-[#9945FF]/20';
@@ -16,27 +21,33 @@ function WhiteCheck({ size = 14 }: { size?: number }) {
 }
 
 export default function CreateProjectForm() {
-  const [title, setTitle] = useState('Website Redesign');
-  const [description, setDescription] = useState(
-    'Redesign the marketing website with responsive layouts and updated branding.\n\nInclude new landing pages, refreshed UI components, and SEO improvements.',
-  );
-  const [wallet, setWallet] = useState('GUngqtYDsULGwwCSjQxkD6V7AytT4FaPp3ReSuPdFaE2');
-  const [amount, setAmount] = useState('2500');
-  const [token, setToken] = useState<'USDC' | 'SOL'>('USDC');
+  const { draft, dispatch } = useFreelance();
+  const balances = useWalletBalances();
+
+  const setDraft = (patch: Partial<typeof draft>) =>
+    dispatch({ type: 'freelance/setDraft', draft: { ...draft, ...patch } });
+
+  const title = draft.title;
+  const description = draft.description;
+  const wallet = draft.freelancerWallet;
+  const amount = draft.amount;
+  const token = draft.token;
 
   const isValidWallet = isValidSolanaAddress(wallet.trim());
   const showInvalidWarning = wallet.trim().length > 0 && !isValidWallet;
+  const amountNum = parseFloat(amount) || 0;
+  const canContinue = title.trim().length > 0 && isValidWallet && amountNum > 0;
 
   const handleAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const filtered = e.target.value.replace(/[^0-9.]/g, '');
     const parts = filtered.split('.');
-    setAmount(parts.length > 2 ? `${parts[0]}.${parts.slice(1).join('')}` : filtered);
+    setDraft({ amount: parts.length > 2 ? `${parts[0]}.${parts.slice(1).join('')}` : filtered });
   };
 
   const tokenBtn = (value: 'USDC' | 'SOL') => (
     <button
       type="button"
-      onClick={() => setToken(value)}
+      onClick={() => setDraft({ token: value })}
       className={`flex h-[48px] flex-1 items-center justify-center gap-1.5 rounded-xl text-[14px] font-bold transition-all ${
         token === value
           ? 'bg-gradient-to-r from-[#9945FF] to-[#14F195] text-white shadow-[0_0_15px_rgba(153,69,255,0.3)]'
@@ -47,6 +58,23 @@ export default function CreateProjectForm() {
       {token === value && <WhiteCheck />}
     </button>
   );
+
+  // Real wallet balance (read-only RPC). Never a hardcoded number.
+  const balanceLine = !balances.connected
+    ? 'Connect your wallet to see your balance'
+    : balances.loading
+      ? 'Loading wallet balance…'
+      : balances.failed
+        ? 'Wallet balance couldn’t be loaded'
+        : token === 'USDC'
+          ? balances.usdc !== null
+            ? `Wallet balance: ${fmt2(balances.usdc)} USDC (devnet)`
+            : 'Wallet balance: — USDC'
+          : balances.sol !== null
+            ? `Wallet balance: ${fmt2(balances.sol)} SOL`
+            : 'Wallet balance: — SOL';
+
+  const draftSaved = draft.draftSavedAt !== null && draft.draftSavedVersion === draft.draftVersion;
 
   return (
     <div className="glass-panel rounded-2xl p-6">
@@ -59,7 +87,7 @@ export default function CreateProjectForm() {
             id="project-title"
             type="text"
             value={title}
-            onChange={(e) => setTitle(e.target.value)}
+            onChange={(e) => setDraft({ title: e.target.value })}
             placeholder="e.g. Website Redesign"
             className={`${INPUT_BASE} h-[48px]`}
           />
@@ -73,7 +101,7 @@ export default function CreateProjectForm() {
             id="project-desc"
             rows={4}
             value={description}
-            onChange={(e) => setDescription(e.target.value)}
+            onChange={(e) => setDraft({ description: e.target.value })}
             placeholder="Describe the scope, deliverables, and technical requirements..."
             className={`${INPUT_BASE} resize-none py-3`}
           />
@@ -88,7 +116,7 @@ export default function CreateProjectForm() {
               id="freelancer-wallet"
               type="text"
               value={wallet}
-              onChange={(e) => setWallet(e.target.value)}
+              onChange={(e) => setDraft({ freelancerWallet: e.target.value })}
               placeholder="Enter Solana wallet address"
               className={`${INPUT_BASE} h-[48px] font-mono text-[14px] ${isValidWallet ? 'pr-[130px]' : ''}`}
             />
@@ -126,24 +154,33 @@ export default function CreateProjectForm() {
               </div>
             </div>
           </div>
-          <p className="mt-2 text-[12px] text-[#9A9AB0]">
-            {token === 'USDC' ? 'Wallet balance: 12,480 USDC' : 'Wallet balance: 86.42 SOL'}
-          </p>
+          <p className="mt-2 text-[12px] text-[#9A9AB0]">{balanceLine}</p>
         </div>
 
         <div className="mt-1 pt-1">
           <a
             href="/freelance/create/milestones"
-            className="flex h-[52px] w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-[#9945FF] to-[#14F195] text-[15px] font-bold text-white shadow-[0_0_25px_rgba(20,241,149,0.25)] transition-all hover:brightness-110 active:scale-[0.99]"
+            aria-disabled={!canContinue}
+            className={`flex h-[52px] w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-[#9945FF] to-[#14F195] text-[15px] font-bold text-white shadow-[0_0_25px_rgba(20,241,149,0.25)] transition-all ${
+              canContinue ? 'hover:brightness-110 active:scale-[0.99]' : 'pointer-events-none opacity-40'
+            }`}
           >
             <span>Continue to Milestones</span>
             <ChevronRightIcon size={17} />
           </a>
+          {!canContinue && (
+            <p className="mt-2 text-center text-[12px] text-[#9A9AB0]">
+              Add a title, a valid freelancer wallet and an amount to continue.
+            </p>
+          )}
           <button
             type="button"
+            onClick={() => dispatch({ type: 'freelance/saveDraft' })}
             className="mx-auto mt-3 block text-[13px] font-medium text-[#9A9AB0] transition-colors hover:text-white"
           >
-            Save as draft
+            {draftSaved && draft.draftSavedAt
+              ? `Draft saved ${formatShortDateTz(new Date(draft.draftSavedAt))}`
+              : 'Save as draft'}
           </button>
         </div>
       </form>

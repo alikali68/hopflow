@@ -21,7 +21,7 @@ export default function CreateEscrowProjectPage() {
           Create Escrow Project
         </h1>
         <p className="mt-2 text-[15px] text-[#9A9AB0]">
-          Lock funds in a non-custodial vault and release them milestone by milestone.
+          Create an escrow project and release funds milestone by milestone.
         </p>
       </div>
 

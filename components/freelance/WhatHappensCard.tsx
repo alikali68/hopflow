@@ -1,17 +1,18 @@
+// components/freelance/WhatHappensCard.tsx
 import React from 'react';
 
 const STEPS = [
   {
-    title: 'You sign and fund the vault',
-    caption: 'Funds are locked in the vault on signing',
+    title: 'You create the escrow record',
+    caption: 'The project is saved in the app with its funds marked as locked',
   },
   {
-    title: 'Each hop releases on its date after approval',
-    caption: 'Auto-release on scheduled date once approved',
+    title: 'Each milestone releases after your approval',
+    caption: 'Approve a delivered milestone to release its funds',
   },
   {
-    title: 'Unused funds return to you anytime before release',
-    caption: 'Cancel anytime to refund the remaining balance',
+    title: 'Unused funds return to you',
+    caption: 'Cancel anytime to refund the remaining balance (recorded in the app)',
   },
 ];
 
@@ -39,6 +40,11 @@ export default function WhatHappensCard() {
           </div>
         ))}
       </div>
+
+      <p className="mt-4 text-[12px] text-[#5C5C72]">
+        Sample escrow — records are kept in the app in this beta; no on-chain route is
+        created.
+      </p>
     </section>
   );
 }

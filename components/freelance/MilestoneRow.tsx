@@ -11,6 +11,7 @@ interface MilestoneRowProps {
   index: number;
   milestone: MilestoneDraft;
   total: number;
+  token: 'USDC' | 'SOL';
   isFirst: boolean;
   isLast: boolean;
   canRemove: boolean;
@@ -23,6 +24,7 @@ export default function MilestoneRow({
   index,
   milestone,
   total,
+  token,
   isFirst,
   isLast,
   canRemove,
@@ -64,7 +66,7 @@ export default function MilestoneRow({
         />
         <div className="relative w-[160px] shrink-0">
           <span className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 font-display text-[14px] font-bold text-white/85">
-            $
+            {token === 'USDC' ? '$' : '◎'}
           </span>
           <input
             type="text"
@@ -72,11 +74,11 @@ export default function MilestoneRow({
             value={milestone.amount}
             onChange={handleAmountChange}
             placeholder="0"
-            aria-label="Milestone amount in USDC"
+            aria-label={`Milestone amount in ${token}`}
             className="h-[42px] w-full rounded-xl border border-transparent bg-gradient-to-r from-[#9945FF] to-[#14F195] pl-8 pr-12 text-right font-display text-[15px] font-bold text-white shadow-[0_0_18px_rgba(153,69,255,0.35)] outline-none transition placeholder-white/50 focus:ring-2 focus:ring-white/40"
           />
           <span className="pointer-events-none absolute right-3.5 top-1/2 -translate-y-1/2 text-[11px] font-bold text-white/85">
-            USDC
+            {token}
           </span>
         </div>
       </div>

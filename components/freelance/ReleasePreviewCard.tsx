@@ -2,7 +2,13 @@ import React from 'react';
 import { MilestoneDraft } from './milestoneTypes';
 import { PulseIcon } from '../icons';
 
-export default function ReleasePreviewCard({ milestones }: { milestones: MilestoneDraft[] }) {
+export default function ReleasePreviewCard({
+  milestones,
+  token,
+}: {
+  milestones: MilestoneDraft[];
+  token: 'USDC' | 'SOL';
+}) {
   return (
     <div className="glass-panel rounded-2xl p-5">
       <div className="flex items-center gap-3">
@@ -21,7 +27,7 @@ export default function ReleasePreviewCard({ milestones }: { milestones: Milesto
                 <span className="absolute -left-[25.5px] top-[5px] h-2.5 w-2.5 rounded-full bg-gradient-to-r from-[#9945FF] to-[#14F195] shadow-[0_0_8px_rgba(20,241,149,0.5)]" />
                 <div className="text-[13.5px] font-semibold text-white">{item.title.trim() || 'Untitled milestone'}</div>
                 <div className="mt-0.5 text-[12px] text-[#9A9AB0]">
-                  {num.toLocaleString('en-US')} USDC · {item.due.trim() || 'No date'}
+                  {num.toLocaleString('en-US')} {token} · {item.due.trim() || 'No date'}
                 </div>
               </div>
             );

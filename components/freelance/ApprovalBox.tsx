@@ -2,34 +2,36 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Milestone, TOKEN, fmt0 } from './projectDetailData';
+import { type FreelanceMilestone, fmt0 } from '@/lib/freelance';
+import { useStore } from '@/lib/store';
 import { CheckCircleIcon, ArrowUpRightIcon } from '../icons';
 
 interface ApprovalBoxProps {
-  milestone: Milestone;
+  projectId: string;
+  milestone: FreelanceMilestone;
+  token: 'USDC' | 'SOL';
 }
 
-export default function ApprovalBox({ milestone }: ApprovalBoxProps) {
-  const [approveState, setApproveState] = useState<'idle' | 'approving' | 'approved'>('idle');
+export default function ApprovalBox({ projectId, milestone, token }: ApprovalBoxProps) {
+  const { dispatch } = useStore();
   const [showForm, setShowForm] = useState(false);
   const [comment, setComment] = useState('');
   const [sent, setSent] = useState(false);
 
   const handleApprove = () => {
-    if (approveState !== 'idle') return;
-    setApproveState('approving');
-    setTimeout(() => {
-      setApproveState('approved');
-    }, 1400);
+    // Recorded in the app store immediately — no fake "signing" timer
+    // and no on-chain claim (there is no escrow settlement call here).
+    dispatch({ type: 'freelance/approveMilestone', projectId, milestoneN: milestone.n });
   };
 
   const handleSendRequest = (e: React.FormEvent) => {
     e.preventDefault();
     if (!comment.trim()) return;
+    dispatch({ type: 'freelance/requestChanges', projectId, milestoneN: milestone.n, text: comment.trim() });
     setSent(true);
   };
 
-  const amountLabel = `${fmt0(milestone.amount)} ${TOKEN}`;
+  const amountLabel = `${fmt0(milestone.amount)} ${token}`;
 
   // Deliverable links come from project data. Only render a link when the
   // value is a plain hostname — anything else (spaces, slashes, @, scheme)
@@ -69,41 +71,14 @@ export default function ApprovalBox({ milestone }: ApprovalBoxProps) {
 
       {/* Actions Row */}
       <div className="mt-3.5 flex flex-wrap items-center gap-3">
-        {approveState === 'idle' && (
-          <button
-            type="button"
-            onClick={handleApprove}
-            className="flex h-[46px] items-center gap-2 rounded-xl bg-gradient-to-r from-[#9945FF] to-[#14F195] px-6 text-[14.5px] font-bold text-white shadow-[0_0_24px_rgba(153,69,255,0.4)] transition hover:brightness-110 active:scale-[0.99]"
-          >
-            <CheckCircleIcon size={16} />
-            <span>Approve & Release {amountLabel}</span>
-          </button>
-        )}
-
-        {approveState === 'approving' && (
-          <button
-            type="button"
-            disabled
-            className="flex h-[46px] cursor-not-allowed items-center gap-2.5 rounded-xl bg-gradient-to-r from-[#9945FF] to-[#14F195] px-6 text-[14.5px] font-bold text-white opacity-90 shadow-[0_0_24px_rgba(153,69,255,0.4)]"
-          >
-            <span
-              className="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white"
-              aria-hidden="true"
-            />
-            <span>Releasing…</span>
-          </button>
-        )}
-
-        {approveState === 'approved' && (
-          <button
-            type="button"
-            disabled
-            className="flex h-[46px] items-center gap-2 rounded-xl bg-gradient-to-r from-[#9945FF] to-[#14F195] px-6 text-[14.5px] font-bold text-white shadow-[0_0_24px_rgba(20,241,149,0.4)] opacity-95"
-          >
-            <CheckCircleIcon size={16} />
-            <span>Released {amountLabel}</span>
-          </button>
-        )}
+        <button
+          type="button"
+          onClick={handleApprove}
+          className="flex h-[46px] items-center gap-2 rounded-xl bg-gradient-to-r from-[#9945FF] to-[#14F195] px-6 text-[14.5px] font-bold text-white shadow-[0_0_24px_rgba(153,69,255,0.4)] transition hover:brightness-110 active:scale-[0.99]"
+        >
+          <CheckCircleIcon size={16} />
+          <span>Approve & Release {amountLabel}</span>
+        </button>
 
         <button
           type="button"
@@ -114,12 +89,16 @@ export default function ApprovalBox({ milestone }: ApprovalBoxProps) {
         </button>
       </div>
 
+      <p className="mt-2.5 text-[12px] text-[#5C5C72]">
+        Approval is recorded in the app — sample escrow, no on-chain settlement in this beta.
+      </p>
+
       {/* Expandable Request Changes Form */}
       {showForm && (
         <div className="mt-3">
           {sent ? (
             <p className="mt-2 text-[13px] font-medium text-[#3DFFB5]">
-              Change request sent — the freelancer was notified.
+              Change request recorded on this project.
             </p>
           ) : (
             <form onSubmit={handleSendRequest}>

@@ -42,6 +42,19 @@ import {
   type RouteStatus,
   type ActivityEntry,
 } from './routes';
+import {
+  seedFreelanceProjects,
+  seedFreelanceDraft,
+  deriveProjectStatus,
+  firstRefundAtOf,
+  refundableOf,
+  inVaultOf,
+  fmt0,
+  type FreelanceProject,
+  type FreelanceDraft,
+} from './freelance';
+import { parseShortDate } from './dates';
+import { combineDateTime } from './route-time';
 
 export const STORE_KEY = 'hopflow-store-v1';
 export const STORE_VERSION = 1;
@@ -56,6 +69,12 @@ export interface BuilderState {
   draftSavedVersion: number;
   /** Increments on every builder mutation; drives the draft-saved indicator. */
   builderVersion: number;
+}
+
+export interface FreelanceState {
+  projects: FreelanceProject[];
+  /** The in-progress create-wizard draft (all three steps share it). */
+  draft: FreelanceDraft;
 }
 
 export interface AppState {
@@ -74,7 +93,12 @@ export interface AppState {
   /** Recent activity — seeded with labelled samples; real actions
    * (draft saved, route paused/resumed) append real entries. */
   activity: ActivityEntry[];
-  // Later M4 steps add: freelance, payroll, vesting, settings.
+  /** Freelance escrow — the single source of truth for the list, detail,
+   * end and create pages. Approvals, change requests, creations and
+   * refund requests are recorded here (in-app only — there is no
+   * on-chain escrow settlement in this beta). */
+  freelance: FreelanceState;
+  // Later M4 steps add: payroll, vesting, settings.
 }
 
 export type StoreAction =
@@ -87,6 +111,13 @@ export type StoreAction =
   | { type: 'session/resetAll' }
   | { type: 'routes/setStatus'; id: string; status: RouteStatus }
   | { type: 'routes/resetToSeed' }
+  | { type: 'freelance/approveMilestone'; projectId: string; milestoneN: number }
+  | { type: 'freelance/requestChanges'; projectId: string; milestoneN: number; text: string }
+  | { type: 'freelance/setDraft'; draft: FreelanceDraft }
+  | { type: 'freelance/saveDraft' }
+  | { type: 'freelance/createProject' }
+  | { type: 'freelance/claimRefund'; projectId: string }
+  | { type: 'freelance/cancelProject'; projectId: string }
   | { type: 'hydrate'; state: AppState };
 
 function seedBuilderState(): BuilderState {
@@ -100,6 +131,13 @@ function seedBuilderState(): BuilderState {
   };
 }
 
+function seedFreelanceState(): FreelanceState {
+  return {
+    projects: seedFreelanceProjects(),
+    draft: seedFreelanceDraft(),
+  };
+}
+
 function seedAppState(): AppState {
   return {
     version: STORE_VERSION,
@@ -107,6 +145,7 @@ function seedAppState(): AppState {
     demoMode: false,
     routes: seedStoreRoutes(),
     activity: seedActivity(),
+    freelance: seedFreelanceState(),
   };
 }
 
@@ -141,6 +180,51 @@ function appendActivity(
     tone,
   };
   return [entry, ...activity].slice(0, 20);
+}
+
+/** Build a store project from the create-wizard draft. Milestones start
+ * locked with the wizard's due dates (10:00 wall time, via the existing
+ * combineDateTime helper). The record is created in the app only — no
+ * on-chain route is created in this beta. */
+function buildProjectFromDraft(draft: FreelanceDraft): FreelanceProject {
+  const total = parseFloat(draft.amount) || 0;
+  const nowIso = new Date().toISOString();
+  return {
+    id: `ep-${Date.now().toString(36)}`,
+    role: 'client',
+    title: draft.title.trim() || 'Untitled project',
+    description: draft.description,
+    counterpartyName: 'Freelancer',
+    counterpartyWallet: draft.freelancerWallet.trim(),
+    token: draft.token,
+    totalAmount: total,
+    createdAt: nowIso,
+    cancelledAt: null,
+    refundRequestedAt: null,
+    status: 'In Progress',
+    milestones: draft.milestones.map((m, i) => {
+      const parsed = parseShortDate(m.due);
+      const due = parsed ? combineDateTime(parsed, '10:00') : null;
+      return {
+        n: i + 1,
+        title: m.title.trim() || `Milestone ${i + 1}`,
+        amount: parseFloat(m.amount) || 0,
+        status: 'locked' as const,
+        dueAt: due ? due.toISOString() : null,
+        deliveredAt: null,
+        releasedAt: null,
+        txSig: null,
+        changeRequest: null,
+      };
+    }),
+    activity: [
+      {
+        title: 'Project created',
+        caption: `Escrow record created in the app — ${total.toLocaleString('en-US')} ${draft.token} locked in the vault`,
+        at: nowIso,
+      },
+    ],
+  };
 }
 
 function reducer(state: AppState, action: StoreAction): AppState {
@@ -194,14 +278,16 @@ function reducer(state: AppState, action: StoreAction): AppState {
     }
     case 'builder/resetToSeed': {
       // "Reset demo data": builder draft back to seed + exit demo mode.
-      // The routes list and activity log are sample data too — they reset
-      // to seed as well so the whole app is coherent again.
+      // The routes list, activity log and freelance projects are sample
+      // data too — they reset to seed as well so the whole app is
+      // coherent again.
       return {
         ...state,
         builder: seedBuilderState(),
         demoMode: false,
         routes: seedStoreRoutes(),
         activity: seedActivity(),
+        freelance: seedFreelanceState(),
       };
     }
     case 'routes/setStatus': {
@@ -224,6 +310,157 @@ function reducer(state: AppState, action: StoreAction): AppState {
     }
     case 'routes/resetToSeed': {
       return { ...state, routes: seedStoreRoutes() };
+    }
+    case 'freelance/approveMilestone': {
+      const project = state.freelance.projects.find((p) => p.id === action.projectId);
+      const milestone = project?.milestones.find((m) => m.n === action.milestoneN);
+      if (!project || !milestone || milestone.status !== 'delivered') return state;
+      const nowIso = new Date().toISOString();
+      const nextProjects = state.freelance.projects.map((p) => {
+        if (p.id !== action.projectId) return p;
+        const nextMilestones = p.milestones.map((m) =>
+          m.n === action.milestoneN
+            ? { ...m, status: 'released' as const, releasedAt: nowIso }
+            : m,
+        );
+        const next: FreelanceProject = {
+          ...p,
+          milestones: nextMilestones,
+          activity: [
+            {
+              title: `Milestone ${milestone.n} released`,
+              caption: `${milestone.title} — ${milestone.amount.toLocaleString('en-US')} ${p.token} released to ${p.counterpartyName}`,
+              at: nowIso,
+            },
+            ...p.activity,
+          ],
+        };
+        return { ...next, status: deriveProjectStatus(next) };
+      });
+      return {
+        ...state,
+        freelance: { ...state.freelance, projects: nextProjects },
+        activity: appendActivity(
+          state.activity,
+          `Milestone ${milestone.n} released — ${milestone.amount.toLocaleString('en-US')} ${project.token} · ${project.title}`,
+          'green',
+        ),
+      };
+    }
+    case 'freelance/requestChanges': {
+      const project = state.freelance.projects.find((p) => p.id === action.projectId);
+      const milestone = project?.milestones.find((m) => m.n === action.milestoneN);
+      if (!project || !milestone || milestone.status !== 'delivered') return state;
+      const nowIso = new Date().toISOString();
+      const nextProjects = state.freelance.projects.map((p) => {
+        if (p.id !== action.projectId) return p;
+        return {
+          ...p,
+          milestones: p.milestones.map((m) =>
+            m.n === action.milestoneN
+              ? { ...m, changeRequest: { text: action.text, at: nowIso } }
+              : m,
+          ),
+          activity: [
+            { title: `Change requested on Milestone ${milestone.n}`, caption: action.text, at: nowIso },
+            ...p.activity,
+          ],
+        };
+      });
+      return {
+        ...state,
+        freelance: { ...state.freelance, projects: nextProjects },
+        activity: appendActivity(
+          state.activity,
+          `Change requested on Milestone ${milestone.n} · ${project.title}`,
+          'amber',
+        ),
+      };
+    }
+    case 'freelance/setDraft': {
+      const d = state.freelance.draft;
+      return {
+        ...state,
+        freelance: {
+          ...state.freelance,
+          draft: { ...action.draft, draftVersion: d.draftVersion + 1 },
+        },
+      };
+    }
+    case 'freelance/saveDraft': {
+      const d = state.freelance.draft;
+      return {
+        ...state,
+        freelance: {
+          ...state.freelance,
+          draft: { ...d, draftSavedAt: new Date().toISOString(), draftSavedVersion: d.draftVersion },
+        },
+      };
+    }
+    case 'freelance/createProject': {
+      const project = buildProjectFromDraft(state.freelance.draft);
+      return {
+        ...state,
+        freelance: { projects: [project, ...state.freelance.projects], draft: seedFreelanceDraft() },
+        activity: appendActivity(state.activity, `Escrow project '${project.title}' created`, 'purple'),
+      };
+    }
+    case 'freelance/cancelProject': {
+      const project = state.freelance.projects.find((p) => p.id === action.projectId);
+      if (!project || project.status === 'Completed' || project.status === 'Cancelled') return state;
+      const nowIso = new Date().toISOString();
+      const nextProjects = state.freelance.projects.map((p) => {
+        if (p.id !== action.projectId) return p;
+        return {
+          ...p,
+          status: 'Cancelled' as const,
+          cancelledAt: nowIso,
+          milestones: p.milestones.map((m) =>
+            m.status === 'locked' || m.status === 'delivered'
+              ? { ...m, status: 'cancelled' as const }
+              : m,
+          ),
+          activity: [
+            {
+              title: 'Project cancelled',
+              caption: `Cancelled by the client — ${fmt0(inVaultOf(p))} ${p.token} released back to the client wallet (recorded in the app)`,
+              at: nowIso,
+            },
+            ...p.activity,
+          ],
+        };
+      });
+      return {
+        ...state,
+        freelance: { ...state.freelance, projects: nextProjects },
+        activity: appendActivity(state.activity, `Project cancelled · ${project.title}`, 'amber'),
+      };
+    }
+    case 'freelance/claimRefund': {
+      const project = state.freelance.projects.find((p) => p.id === action.projectId);
+      if (!project || project.refundRequestedAt) return state;
+      if (project.status === 'Completed' || project.status === 'Cancelled') return state;
+      if (refundableOf(project) <= 0) return state;
+      const first = firstRefundAtOf(project);
+      if (!first || new Date(first).getTime() > Date.now()) return state;
+      const nowIso = new Date().toISOString();
+      const nextProjects = state.freelance.projects.map((p) =>
+        p.id === action.projectId
+          ? {
+              ...p,
+              refundRequestedAt: nowIso,
+              activity: [
+                { title: 'Refund requested', caption: 'Timeout refund requested — recorded in the app', at: nowIso },
+                ...p.activity,
+              ],
+            }
+          : p,
+      );
+      return {
+        ...state,
+        freelance: { ...state.freelance, projects: nextProjects },
+        activity: appendActivity(state.activity, `Refund requested · ${project.title}`, 'amber'),
+      };
     }
     case 'session/setDemoMode': {
       if (state.demoMode === action.demoMode) return state;
@@ -321,6 +558,49 @@ function isValidStoredState(value: unknown): value is AppState {
     });
     if (!ok) return false;
   }
+  // freelance is optional (states saved before step 4 lack it) — but when
+  // present it must be well-shaped.
+  if (v.freelance !== undefined) {
+    const f = v.freelance as Record<string, unknown>;
+    if (!f || typeof f !== 'object' || !Array.isArray(f.projects) || !f.draft || typeof f.draft !== 'object') return false;
+    const projectsOk = (f.projects as unknown[]).every((p) => {
+      if (!p || typeof p !== 'object') return false;
+      const o = p as Record<string, unknown>;
+      return (
+        typeof o.id === 'string' &&
+        (o.role === 'client' || o.role === 'freelancer') &&
+        typeof o.title === 'string' &&
+        typeof o.counterpartyName === 'string' &&
+        typeof o.counterpartyWallet === 'string' &&
+        (o.token === 'USDC' || o.token === 'SOL') &&
+        typeof o.totalAmount === 'number' &&
+        typeof o.createdAt === 'string' &&
+        (o.cancelledAt === null || typeof o.cancelledAt === 'string') &&
+        (o.refundRequestedAt === null || typeof o.refundRequestedAt === 'string') &&
+        (o.status === 'In Progress' ||
+          o.status === 'Awaiting Approval' ||
+          o.status === 'Completed' ||
+          o.status === 'Cancelled') &&
+        Array.isArray(o.milestones) &&
+        Array.isArray(o.activity)
+      );
+    });
+    if (!projectsOk) return false;
+    const d = f.draft as Record<string, unknown>;
+    if (
+      typeof d.title !== 'string' ||
+      typeof d.description !== 'string' ||
+      typeof d.freelancerWallet !== 'string' ||
+      typeof d.amount !== 'string' ||
+      (d.token !== 'USDC' && d.token !== 'SOL') ||
+      !Array.isArray(d.milestones) ||
+      typeof d.draftVersion !== 'number' ||
+      typeof d.draftSavedVersion !== 'number' ||
+      (d.draftSavedAt !== null && typeof d.draftSavedAt !== 'string')
+    ) {
+      return false;
+    }
+  }
   return true;
 }
 
@@ -348,6 +628,20 @@ function reviveStoredState(parsed: AppState): AppState {
     activity: Array.isArray(parsed.activity)
       ? parsed.activity.map((a) => ({ ...a }))
       : seedActivity(),
+    // Pre-step-4 states have no freelance slice — seed it.
+    freelance: parsed.freelance
+      ? {
+          projects: parsed.freelance.projects.map((p) => ({
+            ...p,
+            milestones: p.milestones.map((m) => ({ ...m, changeRequest: m.changeRequest ? { ...m.changeRequest } : null })),
+            activity: p.activity.map((a) => ({ ...a })),
+          })),
+          draft: {
+            ...parsed.freelance.draft,
+            milestones: parsed.freelance.draft.milestones.map((m) => ({ ...m })),
+          },
+        }
+      : seedFreelanceState(),
   };
 }
 
@@ -394,6 +688,16 @@ export function useStore(): { state: AppState; dispatch: React.Dispatch<StoreAct
   const ctx = useContext(StoreContext);
   if (!ctx) throw new Error('useStore must be used inside StoreProvider');
   return ctx;
+}
+
+/** The freelance slice (escrow list, detail, end, create draft). */
+export function useFreelance(): {
+  projects: FreelanceProject[];
+  draft: FreelanceDraft;
+  dispatch: React.Dispatch<StoreAction>;
+} {
+  const { state, dispatch } = useStore();
+  return { projects: state.freelance.projects, draft: state.freelance.draft, dispatch };
 }
 
 /** The routes slice (dashboard list, routes list page, tracking sample

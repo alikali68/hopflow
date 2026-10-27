@@ -5,10 +5,12 @@ export default function AllocationCard({
   total,
   allocated,
   remaining,
+  token,
 }: {
   total: number;
   allocated: number;
   remaining: number;
+  token: 'USDC' | 'SOL';
 }) {
   const remainingColor = remaining === 0 ? 'text-[#14F195]' : remaining > 0 ? 'text-[#F5C542]' : 'text-[#F26D6D]';
 
@@ -32,9 +34,9 @@ export default function AllocationCard({
       </div>
 
       <div className="mt-4 flex flex-col">
-        {row('Project total', `${total.toLocaleString('en-US')} USDC`, 'text-white', true)}
-        {row('Allocated', `${allocated.toLocaleString('en-US')} USDC`)}
-        {row('Remaining', `${remaining.toLocaleString('en-US')} USDC`, remainingColor)}
+        {row('Project total', `${total.toLocaleString('en-US')} ${token}`, 'text-white', true)}
+        {row('Allocated', `${allocated.toLocaleString('en-US')} ${token}`)}
+        {row('Remaining', `${remaining.toLocaleString('en-US')} ${token}`, remainingColor)}
       </div>
     </div>
   );

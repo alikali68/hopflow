@@ -1,26 +1,41 @@
 // components/freelance/TimeoutRefundCard.tsx
 'use client';
 
-import React, { useState } from 'react';
+import React from 'react';
 import { ClockIcon, CheckCircleIcon } from '../icons';
-import { REFUNDABLE, END_SUMMARY, TOKEN, FIRST_REFUND_ISO, fmt0 } from './endOptionsData';
+import {
+  type FreelanceProject,
+  fmt0,
+  refundableOf,
+  firstRefundAtOf,
+} from '@/lib/freelance';
+import { useStore } from '@/lib/store';
+import { useNow } from '@/lib/use-now';
+import { formatCountdown, formatShortDateTz } from '@/lib/dates';
 
-export default function TimeoutRefundCard() {
-  const [claimState, setClaimState] = useState<'idle' | 'claiming' | 'claimed'>('idle');
+export default function TimeoutRefundCard({ project }: { project: FreelanceProject }) {
+  const { dispatch } = useStore();
+  const now = useNow(1000);
+  // useNow is null on the first (SSR) render — fall back to wall-clock
+  // time so the countdown renders instead of crashing.
+  const nowMs = now ? now.getTime() : Date.now();
 
-  const deadlineMs = new Date(`${FIRST_REFUND_ISO}T00:00:00`).getTime();
-  const daysRemaining = Math.max(0, Math.ceil((deadlineMs - Date.now()) / 86400000));
-  const isClaimable = Date.now() >= deadlineMs;
+  // Timeout refunds cover LOCKED (undelivered) milestones only — delivered
+  // milestones are pending the client's approval, not timed out.
+  const locked = project.milestones.filter((m) => m.status === 'locked');
+  const refundable = refundableOf(project);
+  const firstRefundAt = firstRefundAtOf(project);
+  const deadlineMs = firstRefundAt ? new Date(firstRefundAt).getTime() : null;
+  const isClaimable =
+    deadlineMs !== null && nowMs >= deadlineMs && refundable > 0 && !project.refundRequestedAt;
+  const remainingMs = deadlineMs !== null ? deadlineMs - nowMs : 0;
 
   const handleClaim = () => {
-    if (!isClaimable || claimState !== 'idle') return;
-    setClaimState('claiming');
-    setTimeout(() => {
-      setClaimState('claimed');
-    }, 1400);
+    if (!isClaimable) return;
+    // Records the request in the store. There is no on-chain rescue call
+    // in this beta — no fake "Refunded" success.
+    dispatch({ type: 'freelance/claimRefund', projectId: project.id });
   };
-
-  const formattedRefundable = `${fmt0(END_SUMMARY.refundable)} ${TOKEN}`;
 
   return (
     <section className="grad-border rounded-2xl p-5" aria-label="Timeout refund">
@@ -41,7 +56,12 @@ export default function TimeoutRefundCard() {
 
       {/* Refundable Milestones List */}
       <div className="mt-3 flex flex-col">
-        {REFUNDABLE.map((m) => (
+        {locked.length === 0 && (
+          <p className="py-2.5 text-[13.5px] text-[#9A9AB0]">
+            No locked milestones — nothing to refund on timeout.
+          </p>
+        )}
+        {locked.map((m) => (
           <div
             key={m.n}
             className="flex items-center justify-between gap-3 border-b border-white/5 py-2.5 last:border-0"
@@ -57,10 +77,10 @@ export default function TimeoutRefundCard() {
 
             <div className="flex shrink-0 flex-col items-end">
               <span className="font-display text-[14.5px] font-bold whitespace-nowrap text-white">
-                {fmt0(m.amount)} {TOKEN}
+                {fmt0(m.amount)} {project.token}
               </span>
               <span className="text-[12px] text-[#9A9AB0]">
-                {m.dueLabel}
+                {m.dueAt ? formatShortDateTz(new Date(m.dueAt)) : 'No due date'}
               </span>
             </div>
           </div>
@@ -68,14 +88,41 @@ export default function TimeoutRefundCard() {
       </div>
 
       {/* Live Countdown Line */}
-      <div className="mt-3 flex items-center gap-1.5 text-[13px] font-medium text-[#F5C542]">
-        <ClockIcon size={14} />
-        <span>First refund available in {daysRemaining} days</span>
-      </div>
+      {deadlineMs !== null && remainingMs > 0 && (
+        <div className="mt-3 flex items-center gap-1.5 text-[13px] font-medium text-[#F5C542]">
+          <ClockIcon size={14} />
+          <span>
+            First refund available in {formatCountdown(new Date(deadlineMs), now ?? new Date())} ·{' '}
+            {formatShortDateTz(new Date(deadlineMs))}
+          </span>
+        </div>
+      )}
+      {deadlineMs !== null && remainingMs <= 0 && !project.refundRequestedAt && refundable > 0 && (
+        <div className="mt-3 flex items-center gap-1.5 text-[13px] font-medium text-[#F5C542]">
+          <ClockIcon size={14} />
+          <span>Deadline passed {formatShortDateTz(new Date(deadlineMs))} — refund available</span>
+        </div>
+      )}
 
       {/* Claim Button / States */}
       <div className="mt-3.5">
-        {!isClaimable && (
+        {project.refundRequestedAt ? (
+          <div>
+            <button
+              type="button"
+              disabled
+              className="flex h-[46px] w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-[#9945FF] to-[#14F195] px-6 text-[14.5px] font-bold text-white opacity-95"
+            >
+              <CheckCircleIcon size={16} />
+              <span>Refund requested</span>
+            </button>
+            <p className="mt-2 text-center text-[12.5px] text-[#9A9AB0]">
+              Requested {formatShortDateTz(new Date(project.refundRequestedAt))} — recorded in
+              the app. The on-chain rescue is not wired in this beta; follow up with support
+              to complete it.
+            </p>
+          </div>
+        ) : !isClaimable ? (
           <div>
             <button
               type="button"
@@ -85,43 +132,20 @@ export default function TimeoutRefundCard() {
               Claim Refund
             </button>
             <p className="mt-2 text-center text-[12.5px] text-[#9A9AB0]">
-              Available after the deadline
+              {refundable <= 0
+                ? 'Nothing to refund on this project'
+                : 'Available after the deadline'}
             </p>
           </div>
-        )}
-
-        {isClaimable && claimState === 'idle' && (
+        ) : (
           <button
             type="button"
             onClick={handleClaim}
             className="flex h-[46px] w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-[#9945FF] to-[#14F195] px-6 text-[14.5px] font-bold text-white shadow-[0_0_24px_rgba(153,69,255,0.4)] transition hover:brightness-110 active:scale-[0.99]"
           >
-            <span>Claim Refund — {formattedRefundable}</span>
-          </button>
-        )}
-
-        {isClaimable && claimState === 'claiming' && (
-          <button
-            type="button"
-            disabled
-            className="flex h-[46px] w-full cursor-not-allowed items-center justify-center gap-2.5 rounded-xl bg-gradient-to-r from-[#9945FF] to-[#14F195] px-6 text-[14.5px] font-bold text-white opacity-90 shadow-[0_0_24px_rgba(153,69,255,0.4)]"
-          >
-            <span
-              className="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white"
-              aria-hidden="true"
-            />
-            <span>Claiming…</span>
-          </button>
-        )}
-
-        {isClaimable && claimState === 'claimed' && (
-          <button
-            type="button"
-            disabled
-            className="flex h-[46px] w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-[#9945FF] to-[#14F195] px-6 text-[14.5px] font-bold text-white shadow-[0_0_24px_rgba(20,241,149,0.4)] opacity-95"
-          >
-            <CheckCircleIcon size={16} />
-            <span>Refunded {formattedRefundable}</span>
+            <span>
+              Claim Refund — {fmt0(refundable)} {project.token}
+            </span>
           </button>
         )}
       </div>

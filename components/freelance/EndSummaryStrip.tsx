@@ -1,9 +1,21 @@
 // components/freelance/EndSummaryStrip.tsx
 import React from 'react';
 import { NodesIcon, CheckCircleIcon, HourglassIcon } from '../icons';
-import { END_SUMMARY, TOKEN, fmt0 } from './endOptionsData';
+import {
+  type FreelanceProject,
+  fmt0,
+  releasedAmountOf,
+  inVaultOf,
+  refundableOf,
+} from '@/lib/freelance';
 
-export default function EndSummaryStrip() {
+export default function EndSummaryStrip({ project }: { project: FreelanceProject }) {
+  const released = releasedAmountOf(project);
+  const inVault = inVaultOf(project);
+  // Timeout path refunds LOCKED (undelivered) milestones only — delivered
+  // milestones are pending approval, not timed out.
+  const refundable = refundableOf(project);
+
   return (
     <div className="glass-panel mt-5 rounded-2xl px-5 py-4">
       <div className="grid grid-cols-1 divide-y divide-white/5 sm:grid-cols-3 sm:divide-x sm:divide-y-0">
@@ -15,7 +27,7 @@ export default function EndSummaryStrip() {
           <div className="flex flex-col">
             <span className="text-[13px] text-[#9A9AB0]">In vault</span>
             <span className="font-display text-[26px] font-bold leading-tight text-white">
-              {fmt0(END_SUMMARY.inVault)} {TOKEN}
+              {fmt0(inVault)} {project.token}
             </span>
           </div>
         </div>
@@ -28,7 +40,7 @@ export default function EndSummaryStrip() {
           <div className="flex flex-col">
             <span className="text-[13px] text-[#9A9AB0]">Released</span>
             <span className="font-display text-[26px] font-bold leading-tight text-white">
-              {fmt0(END_SUMMARY.released)} {TOKEN}
+              {fmt0(released)} {project.token}
             </span>
           </div>
         </div>
@@ -41,7 +53,7 @@ export default function EndSummaryStrip() {
           <div className="flex flex-col">
             <span className="text-[13px] text-[#9A9AB0]">Refundable after deadline</span>
             <span className="font-display text-[26px] font-bold leading-tight text-white">
-              {fmt0(END_SUMMARY.refundable)} {TOKEN}
+              {fmt0(refundable)} {project.token}
             </span>
           </div>
         </div>

@@ -1,9 +1,10 @@
 // components/freelance/ActivityCard.tsx
 import React from 'react';
 import { PulseIcon } from '../icons';
-import { ACTIVITY } from './projectDetailData';
+import { type FreelanceProject } from '@/lib/freelance';
+import { formatShortDateTz } from '@/lib/dates';
 
-export default function ActivityCard() {
+export default function ActivityCard({ project }: { project: FreelanceProject }) {
   return (
     <section className="grad-border rounded-2xl p-5" aria-label="Activity">
       {/* Header */}
@@ -18,9 +19,9 @@ export default function ActivityCard() {
 
       {/* Activity Timeline Items */}
       <div className="mt-4 flex flex-col">
-        {ACTIVITY.map((item) => (
+        {project.activity.map((item) => (
           <div
-            key={item.title}
+            key={`${item.title}-${item.at}`}
             className="flex gap-3 border-b border-white/5 py-2.5 first:pt-1 last:border-0 last:pb-0"
           >
             <span
@@ -33,6 +34,9 @@ export default function ActivityCard() {
               </span>
               <span className="mt-0.5 text-[12.5px] text-[#9A9AB0]">
                 {item.caption}
+              </span>
+              <span className="mt-0.5 text-[11.5px] text-[#5C5C72]">
+                {formatShortDateTz(new Date(item.at))}
               </span>
             </div>
           </div>

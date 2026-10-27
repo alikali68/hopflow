@@ -23,7 +23,7 @@ export default function FeesCard() {
         </div>
         <div className="mt-2.5 flex items-center justify-between pt-1 text-[13px]">
           <span className="text-[#9A9AB0]">You pay today</span>
-          <span className="font-semibold text-white">0 — funding happens at review</span>
+          <span className="font-semibold text-white">0 — no on-chain payment in this beta</span>
         </div>
       </div>
     </div>

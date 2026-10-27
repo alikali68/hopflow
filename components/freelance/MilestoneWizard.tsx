@@ -1,52 +1,50 @@
+// components/freelance/MilestoneWizard.tsx
 'use client';
 
-import React, { useState } from 'react';
-import { MilestoneDraft, PROJECT_TOTAL, PROJECT_TOKEN } from './milestoneTypes';
+import React from 'react';
+import { type MilestoneDraft } from './milestoneTypes';
 import MilestoneRow from './MilestoneRow';
 import ReleasePreviewCard from './ReleasePreviewCard';
 import AllocationCard from './AllocationCard';
+import { useFreelance } from '@/lib/store';
 import { PlusIcon, ChevronRightIcon } from '../icons';
 
-const INITIAL_MILESTONES: MilestoneDraft[] = [
-  { id: 'm-1', title: 'Homepage & layout', amount: '1000', due: 'Oct 28, 2026' },
-  { id: 'm-2', title: 'UI components & pages', amount: '875', due: 'Nov 04, 2026' },
-  { id: 'm-3', title: 'SEO & launch polish', amount: '625', due: 'Nov 11, 2026' },
-];
-
 export default function MilestoneWizard() {
-  const [milestones, setMilestones] = useState<MilestoneDraft[]>(INITIAL_MILESTONES);
-  const [nextId, setNextId] = useState(4);
+  const { draft, dispatch } = useFreelance();
+  const milestones = draft.milestones;
+  const total = parseFloat(draft.amount) || 0;
+  const token = draft.token;
+
+  const setMilestones = (next: MilestoneDraft[]) =>
+    dispatch({ type: 'freelance/setDraft', draft: { ...draft, milestones: next } });
 
   const allocated = milestones.reduce((sum, m) => sum + (parseFloat(m.amount) || 0), 0);
-  const remaining = PROJECT_TOTAL - allocated;
-  const pct = Math.round((allocated / PROJECT_TOTAL) * 100);
+  const remaining = total - allocated;
+  const pct = total > 0 ? Math.round((allocated / total) * 100) : 0;
   const isOver = remaining < 0;
 
   const update = (index: number, patch: Partial<MilestoneDraft>) =>
-    setMilestones((prev) => prev.map((m, i) => (i === index ? { ...m, ...patch } : m)));
+    setMilestones(milestones.map((m, i) => (i === index ? { ...m, ...patch } : m)));
 
   const add = () => {
     if (milestones.length >= 6) return;
-    setMilestones((prev) => [
-      ...prev,
-      { id: `m-${nextId}`, title: '', amount: remaining > 0 ? String(remaining) : '0', due: '' },
+    setMilestones([
+      ...milestones,
+      { id: `m-${Date.now().toString(36)}`, title: '', amount: remaining > 0 ? String(remaining) : '0', due: '' },
     ]);
-    setNextId((c) => c + 1);
   };
 
   const remove = (index: number) => {
     if (milestones.length <= 1) return;
-    setMilestones((prev) => prev.filter((_, i) => i !== index));
+    setMilestones(milestones.filter((_, i) => i !== index));
   };
 
   const move = (index: number, dir: -1 | 1) => {
     const target = index + dir;
     if (target < 0 || target >= milestones.length) return;
-    setMilestones((prev) => {
-      const copy = [...prev];
-      [copy[index], copy[target]] = [copy[target], copy[index]];
-      return copy;
-    });
+    const copy = [...milestones];
+    [copy[index], copy[target]] = [copy[target], copy[index]];
+    setMilestones(copy);
   };
 
   return (
@@ -60,7 +58,8 @@ export default function MilestoneWizard() {
               key={m.id}
               index={i}
               milestone={m}
-              total={PROJECT_TOTAL}
+              total={total}
+              token={token}
               isFirst={i === 0}
               isLast={i === milestones.length - 1}
               canRemove={milestones.length > 1}
@@ -114,10 +113,10 @@ export default function MilestoneWizard() {
             }`}
           >
             {remaining === 0
-              ? `Fully allocated · ${allocated.toLocaleString('en-US')} of ${PROJECT_TOTAL.toLocaleString('en-US')} ${PROJECT_TOKEN} · 100%`
+              ? `Fully allocated · ${allocated.toLocaleString('en-US')} of ${total.toLocaleString('en-US')} ${token} · 100%`
               : remaining > 0
-                ? `${remaining.toLocaleString('en-US')} ${PROJECT_TOKEN} unallocated · ${pct}% allocated`
-                : `Over-allocated by ${Math.abs(remaining).toLocaleString('en-US')} ${PROJECT_TOKEN}`}
+                ? `${remaining.toLocaleString('en-US')} ${token} unallocated · ${pct}% allocated`
+                : `Over-allocated by ${Math.abs(remaining).toLocaleString('en-US')} ${token}`}
           </span>
         </div>
 
@@ -143,8 +142,8 @@ export default function MilestoneWizard() {
       </section>
 
       <aside className="flex flex-col gap-6" aria-label="Release preview and allocation">
-        <ReleasePreviewCard milestones={milestones} />
-        <AllocationCard total={PROJECT_TOTAL} allocated={allocated} remaining={remaining} />
+        <ReleasePreviewCard milestones={milestones} token={token} />
+        <AllocationCard total={total} allocated={allocated} remaining={remaining} token={token} />
       </aside>
     </div>
   );

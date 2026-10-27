@@ -1,5 +1,5 @@
 import React from 'react';
-import { EscrowProject } from '../data';
+import { type EscrowProject } from '@/lib/freelance';
 import { BellIcon } from '../icons';
 
 export default function ApprovalCard({
@@ -29,12 +29,12 @@ export default function ApprovalCard({
             </span>
             <span className="text-[12px] text-[#9A9AB0]">{project.nextAction}</span>
             {role === 'client' && (
-              <button
-                type="button"
+              <a
+                href={`/freelance/${project.id}#review`}
                 className="mt-2.5 flex h-[38px] w-full items-center justify-center rounded-xl bg-gradient-to-r from-[#9945FF] to-[#14F195] text-[13px] font-bold text-white shadow-[0_0_15px_rgba(153,69,255,0.25)] transition-all hover:brightness-110 active:scale-[0.98]"
               >
                 Review delivery
-              </button>
+              </a>
             )}
           </div>
         ))}
