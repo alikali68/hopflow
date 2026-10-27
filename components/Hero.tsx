@@ -1,4 +1,12 @@
-import React from 'react';
+'use client';
+
+import React, { useEffect, useRef, useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { useWallet } from '@solana/wallet-adapter-react';
+import { useWalletModal } from '@solana/wallet-adapter-react-ui';
+import { signAuthMessage } from '@/lib/client-auth';
+import { getSessionAuth, setSessionAuth } from '@/lib/session';
+import { useStore } from '@/lib/store';
 import { PlayIcon } from './icons';
 
 function NodeGlyph({ index, cx, cy }: { index: number; cx: number; cy: number }) {
@@ -124,6 +132,83 @@ function RouteDiagram() {
 }
 
 export default function Hero() {
+  const router = useRouter();
+  const { publicKey, signMessage, connected } = useWallet();
+  const { visible, setVisible } = useWalletModal();
+  const { dispatch } = useStore();
+  const [launchState, setLaunchState] = useState<'idle' | 'waiting' | 'signing' | 'error'>('idle');
+  const [launchError, setLaunchError] = useState<string | null>(null);
+  const signingRef = useRef(false);
+
+  // Sign the auth message to establish a session, then enter the app.
+  // No funds move — the signature only proves the user owns the wallet.
+  const signAndEnter = async (address: string) => {
+    if (!signMessage) {
+      setLaunchError('This wallet cannot sign messages — use Phantom to enter the app.');
+      setLaunchState('error');
+      return;
+    }
+    if (signingRef.current) return;
+    signingRef.current = true;
+    setLaunchState('signing');
+    setLaunchError(null);
+    try {
+      const auth = await signAuthMessage(address, signMessage);
+      setSessionAuth(auth);
+      dispatch({ type: 'session/setDemoMode', demoMode: false });
+      router.push('/dashboard');
+    } catch (err) {
+      setLaunchError(
+        err instanceof Error ? err.message : 'Signing failed — the app was not opened.',
+      );
+      setLaunchState('error');
+    } finally {
+      signingRef.current = false;
+    }
+  };
+
+  const handleLaunchApp = () => {
+    setLaunchError(null);
+    if (connected && publicKey) {
+      // Already connected: if this wallet already has a session, enter
+      // directly; otherwise sign once, then enter.
+      const existing = getSessionAuth();
+      if (existing && existing.address === publicKey.toBase58()) {
+        dispatch({ type: 'session/setDemoMode', demoMode: false });
+        router.push('/dashboard');
+        return;
+      }
+      void signAndEnter(publicKey.toBase58());
+      return;
+    }
+    // No wallet yet: open the connect modal; the effect below signs once
+    // the wallet connects.
+    setLaunchState('waiting');
+    setVisible(true);
+  };
+
+  // After the modal connects the wallet, sign and enter.
+  useEffect(() => {
+    if (launchState !== 'waiting') return;
+    if (!connected || !publicKey) return;
+    void signAndEnter(publicKey.toBase58());
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [launchState, connected, publicKey]);
+
+  // Modal closed without connecting: back to idle.
+  useEffect(() => {
+    if (launchState === 'waiting' && !visible && !connected) {
+      setLaunchState('idle');
+    }
+  }, [launchState, visible, connected]);
+
+  // Demo entry: no wallet required — the app opens with sample data and an
+  // honest "Demo" badge. The demo video comes at the end of M4.
+  const handleWatchDemo = () => {
+    dispatch({ type: 'session/setDemoMode', demoMode: true });
+    router.push('/dashboard');
+  };
+
   return (
     <section
       className="grid grid-cols-1 items-center gap-12 pt-12 md:pt-[72px] lg:grid-cols-[560px_1fr] lg:gap-16"
@@ -146,19 +231,32 @@ export default function Hero() {
         <div className="mt-9 flex flex-wrap items-center gap-4">
           <button
             type="button"
-            className="flex h-[52px] w-[170px] items-center justify-center rounded-btn bg-primary-gradient text-[16px] font-bold text-white shadow-sm transition-all duration-150 hover:brightness-110 active:scale-[0.98]"
+            onClick={handleLaunchApp}
+            disabled={launchState === 'signing'}
+            className="flex h-[52px] w-[170px] items-center justify-center rounded-btn bg-primary-gradient text-[16px] font-bold text-white shadow-sm transition-all duration-150 hover:brightness-110 active:scale-[0.98] disabled:opacity-70"
           >
-            Launch App
+            {launchState === 'signing'
+              ? 'Signing in…'
+              : launchState === 'waiting'
+                ? 'Connect wallet…'
+                : 'Launch App'}
           </button>
 
           <button
             type="button"
+            onClick={handleWatchDemo}
             className="flex h-[52px] w-[170px] items-center justify-center gap-2 rounded-btn border border-borderStrong bg-transparent text-[16px] font-semibold text-white transition-colors duration-150 hover:border-solanaPurple"
           >
             <PlayIcon size={14} className="text-white" />
             <span>Watch Demo</span>
           </button>
         </div>
+
+        {launchError && (
+          <p role="alert" className="mt-3 max-w-[520px] text-[14px] leading-[20px] text-red-400">
+            {launchError}
+          </p>
+        )}
       </div>
 
       {/* Right Column: Diagram */}

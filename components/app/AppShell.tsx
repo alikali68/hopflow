@@ -1,5 +1,6 @@
 import React from 'react';
 import Sidebar from './Sidebar';
+import DemoBadge from './DemoBadge';
 
 export default function AppShell({
   children,
@@ -25,7 +26,10 @@ export default function AppShell({
       <div className="relative z-10 mx-auto max-w-[1400px] p-5 md:p-7">
         <div className="grid grid-cols-1 gap-7 lg:grid-cols-[264px_1fr]">
           <Sidebar active={active} />
-          <main className="flex min-w-0 flex-col gap-6">{children}</main>
+          <main className="flex min-w-0 flex-col gap-6">
+            <DemoBadge />
+            {children}
+          </main>
         </div>
       </div>
     </div>

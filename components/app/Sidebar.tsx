@@ -1,4 +1,9 @@
+'use client';
+
 import React from 'react';
+import { useWallet } from '@solana/wallet-adapter-react';
+import { useWalletModal } from '@solana/wallet-adapter-react-ui';
+import { clearSessionAuth } from '@/lib/session';
 import {
   DashboardGridIcon,
   HandshakeIcon,
@@ -17,10 +22,24 @@ const NAV = [
   { label: 'Token Vesting', href: '/vesting', icon: <HourglassIcon size={18} /> },
   { label: 'Route Builder', href: '/builder', icon: <NodesIcon size={18} variant="current" /> },
   { label: 'Route Tracking', href: '/routes/rt-1', icon: <PulseIcon size={18} /> },
-  { label: 'Settings', href: '#', icon: <SettingsIcon size={18} /> },
+  { label: 'Settings', href: '/settings', icon: <SettingsIcon size={18} /> },
 ];
 
+/** First 4 + last 4 of a base58 address, e.g. 7qEo…erFJ. */
+function truncateAddress(address: string): string {
+  if (address.length <= 8) return address;
+  return `${address.slice(0, 4)}...${address.slice(-4)}`;
+}
+
 export default function Sidebar({ active = 'Dashboard' }: { active?: string }) {
+  const { publicKey, connected, disconnect } = useWallet();
+  const { setVisible } = useWalletModal();
+
+  const handleDisconnect = () => {
+    // End the entry session too — a new wallet must sign again on entry.
+    clearSessionAuth();
+    void disconnect();
+  };
   return (
     <aside className="sticky top-6 flex flex-col gap-4">
       {/* compact brand row — the real HopFlow mark */}
@@ -58,26 +77,57 @@ export default function Sidebar({ active = 'Dashboard' }: { active?: string }) {
           })}
         </nav>
 
-        {/* connected wallet card */}
+        {/* wallet card — the REAL adapter state, never a hardcoded address.
+            When no wallet is connected this honestly says so and offers to
+            connect; the old card showed a fake connected wallet on every
+            page (audit S9). */}
         <div className="grad-border-soft mt-8 rounded-xl p-3">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <span className="flex h-6 w-6 items-center justify-center rounded-md bg-[#14F195]/20 text-[#14F195]">
-                <WalletIcon size={14} />
-              </span>
-              <span className="font-mono text-[13px] font-semibold text-white">7qEo...erFJ</span>
-            </div>
-            <span className="inline-flex items-center gap-1 rounded-full bg-[#14F195]/15 px-2 py-0.5 text-[11px] font-medium text-[#14F195]">
-              <span className="h-1.5 w-1.5 rounded-full bg-[#14F195]" />
-              Devnet
-            </span>
-          </div>
-          <button
-            type="button"
-            className="mt-2.5 w-full text-left text-[12px] font-medium text-[#9A9AB0] transition-colors hover:text-white"
-          >
-            Disconnect
-          </button>
+          {connected && publicKey ? (
+            <>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <span className="flex h-6 w-6 items-center justify-center rounded-md bg-[#14F195]/20 text-[#14F195]">
+                    <WalletIcon size={14} />
+                  </span>
+                  <span className="font-mono text-[13px] font-semibold text-white">
+                    {truncateAddress(publicKey.toBase58())}
+                  </span>
+                </div>
+                <span className="inline-flex items-center gap-1 rounded-full bg-[#14F195]/15 px-2 py-0.5 text-[11px] font-medium text-[#14F195]">
+                  <span className="h-1.5 w-1.5 rounded-full bg-[#14F195]" />
+                  Devnet
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={handleDisconnect}
+                className="mt-2.5 w-full text-left text-[12px] font-medium text-[#9A9AB0] transition-colors hover:text-white"
+              >
+                Disconnect
+              </button>
+            </>
+          ) : (
+            <>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <span className="flex h-6 w-6 items-center justify-center rounded-md bg-white/10 text-[#9A9AB0]">
+                    <WalletIcon size={14} />
+                  </span>
+                  <span className="text-[13px] font-semibold text-white">Not connected</span>
+                </div>
+                <span className="inline-flex items-center gap-1 rounded-full bg-white/10 px-2 py-0.5 text-[11px] font-medium text-[#9A9AB0]">
+                  Devnet
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setVisible(true)}
+                className="mt-2.5 flex h-[36px] w-full items-center justify-center rounded-lg bg-gradient-to-r from-[#9945FF] to-[#14F195] text-[13px] font-bold text-white transition-all hover:brightness-110 active:scale-[0.98]"
+              >
+                Connect Wallet
+              </button>
+            </>
+          )}
         </div>
       </div>
     </aside>

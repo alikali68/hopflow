@@ -15,6 +15,7 @@
  * Step 1 implements the BUILDER slice fully. Other slices (routes,
  * freelance projects, payroll teams, vesting plans, reviews, settings)
  * land in later M4 steps — this file is where they will live.
+ * Step 2 adds the session flag `demoMode` (landing "Watch Demo" entry).
  */
 
 import React, {
@@ -52,6 +53,13 @@ export interface BuilderState {
 export interface AppState {
   version: number;
   builder: BuilderState;
+  /**
+   * Demo mode: entered via landing "Watch Demo" — the app is explored with
+   * sample data and NO wallet is required. Cleared by "Launch App" (real
+   * entry). It is a UI flag only — the data is sample data either way until
+   * the modules are wired to real data in later M4 steps.
+   */
+  demoMode: boolean;
   // Later M4 steps add: routes, freelance, payroll, vesting, settings.
 }
 
@@ -60,6 +68,9 @@ export type StoreAction =
   | { type: 'builder/setSchedules'; schedules: HopSchedule[] }
   | { type: 'builder/setMode'; mode: ScheduleMode }
   | { type: 'builder/saveDraft' }
+  | { type: 'builder/resetToSeed' }
+  | { type: 'session/setDemoMode'; demoMode: boolean }
+  | { type: 'session/resetAll' }
   | { type: 'hydrate'; state: AppState };
 
 function seedBuilderState(): BuilderState {
@@ -74,7 +85,7 @@ function seedBuilderState(): BuilderState {
 }
 
 function seedAppState(): AppState {
-  return { version: STORE_VERSION, builder: seedBuilderState() };
+  return { version: STORE_VERSION, builder: seedBuilderState(), demoMode: false };
 }
 
 /** Every hop needs a schedule — fill in defaults for hops that lack one (new/added hops), drop the rest. */
@@ -136,6 +147,19 @@ function reducer(state: AppState, action: StoreAction): AppState {
         },
       };
     }
+    case 'builder/resetToSeed': {
+      // "Reset demo data": builder draft back to seed + exit demo mode.
+      return { ...state, builder: seedBuilderState(), demoMode: false };
+    }
+    case 'session/setDemoMode': {
+      if (state.demoMode === action.demoMode) return state;
+      return { ...state, demoMode: action.demoMode };
+    }
+    case 'session/resetAll': {
+      // "Clear saved data": everything back to seed (Settings also removes
+      // the localStorage key; the persist effect then stores the seed state).
+      return seedAppState();
+    }
     default:
       return state;
   }
@@ -180,6 +204,9 @@ function isValidStoredState(value: unknown): value is AppState {
   ) {
     return false;
   }
+  // demoMode is optional (states saved before step 2 lack it) — but when
+  // present it must be a boolean.
+  if (v.demoMode !== undefined && typeof v.demoMode !== 'boolean') return false;
   return true;
 }
 
@@ -198,6 +225,7 @@ function reviveStoredState(parsed: AppState): AppState {
       draftSavedVersion: parsed.builder.draftSavedVersion,
       builderVersion: parsed.builder.builderVersion,
     },
+    demoMode: typeof parsed.demoMode === 'boolean' ? parsed.demoMode : false,
   };
 }
 

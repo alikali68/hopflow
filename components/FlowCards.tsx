@@ -44,7 +44,7 @@ export default function FlowCards() {
         {FLOWS.map((item) => (
           <a
             key={item.id}
-            href="#"
+            href={item.href}
             className="group relative flex min-h-[196px] flex-col items-center rounded-panel border border-border glass-panel p-6 text-center transition-all duration-200 ease-out hover:-translate-y-1 hover:border-solanaPurple"
           >
             {/* Icon Tile — dark glass with gradient rim (per mockup) */}

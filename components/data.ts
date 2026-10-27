@@ -15,6 +15,7 @@ export interface FlowItem {
   title: string;
   description: string;
   iconName: 'handshake' | 'users' | 'lock' | 'nodes';
+  href: string;
 }
 
 export interface StepItem {
@@ -26,34 +27,15 @@ export interface StepItem {
 export interface FooterLink {
   label: string;
   href: string;
+  /** External links open in a new tab with rel="noopener noreferrer". */
+  external?: boolean;
 }
 
 export const NAV_LINKS: NavLink[] = [
-  { label: 'Freelance', href: '#' },
-  { label: 'Payroll', href: '#' },
-  { label: 'Vesting', href: '#' },
-  { label: 'Builder', href: '#' },
-];
-
-export const STATS: StatItem[] = [
-  {
-    value: '1,240+',
-    label: 'Routes created',
-    isGradient: true,
-    hasTrend: true,
-  },
-  {
-    value: '8.6M',
-    label: 'USDC routed',
-    isGradient: false,
-    hasTrend: false,
-  },
-  {
-    value: '3,900',
-    label: 'Users',
-    isGradient: false,
-    hasTrend: true,
-  },
+  { label: 'Freelance', href: '/freelance' },
+  { label: 'Payroll', href: '/payroll' },
+  { label: 'Vesting', href: '/vesting' },
+  { label: 'Builder', href: '/builder' },
 ];
 
 export const FLOWS: FlowItem[] = [
@@ -62,24 +44,28 @@ export const FLOWS: FlowItem[] = [
     title: 'Freelance Escrow',
     description: 'Secure escrow payments with milestone releases',
     iconName: 'handshake',
+    href: '/freelance',
   },
   {
     id: 'payroll',
     title: 'Team Payroll',
     description: 'Batch pay your team on schedule, every month',
     iconName: 'users',
+    href: '/payroll',
   },
   {
     id: 'vesting',
     title: 'Token Vesting',
     description: 'Automate linear or cliff-based vesting schedules',
     iconName: 'lock',
+    href: '/vesting',
   },
   {
     id: 'builder',
     title: 'Route Builder',
     description: 'Drag and drop to design custom payment routes',
     iconName: 'nodes',
+    href: '/builder',
   },
 ];
 
@@ -102,11 +88,12 @@ export const STEPS: StepItem[] = [
 ];
 
 export const FOOTER_LINKS: FooterLink[] = [
-  { label: 'Privacy', href: '#' },
-  { label: 'Terms', href: '#' },
-  { label: 'Docs', href: '#' },
-  { label: 'Github', href: '#' },
-  { label: 'Twitter', href: '#' },
+  { label: 'Privacy', href: '/privacy' },
+  { label: 'Terms', href: '/terms' },
+  { label: 'Docs', href: '/docs' },
+  // The repo is private: it 404s for anyone but the owner.
+  { label: 'Github', href: 'https://github.com/alikali68/hopflow', external: true },
+  { label: 'Twitter', href: 'https://x.com/alikali68', external: true },
 ];
 /* ══════════ DATA FOR DASHBOARD (PAGE 02) ══════════ */
 
