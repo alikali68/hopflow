@@ -6,7 +6,14 @@ import Topbar from '@/components/app/Topbar';
 import { useWallet } from '@solana/wallet-adapter-react';
 import { WalletMultiButton, useWalletModal } from '@solana/wallet-adapter-react-ui';
 import { clearSessionAuth } from '@/lib/session';
-import { STORE_KEY, useStore } from '@/lib/store';
+import { STORE_KEY, useStore, useTimezone } from '@/lib/store';
+import { setEffectiveTimeZone } from '@/lib/dates';
+import {
+  TIMEZONE_CHOICES,
+  detectUserTimeZone,
+  formatZoneLabel,
+  zoneObservesDst,
+} from '@/lib/timezone';
 
 /** First 4 + last 4 of a base58 address, e.g. 7qEo…erFJ. */
 function truncateAddress(address: string): string {
@@ -45,9 +52,23 @@ export default function SettingsPage() {
   const { publicKey, connected, disconnect } = useWallet();
   const { setVisible } = useWalletModal();
   const { state, dispatch } = useStore();
+  const { mode, zone, resolved, detected } = useTimezone();
   const [clearState, setClearState] = useState<'idle' | 'confirm' | 'done'>('idle');
   const [resetDone, setResetDone] = useState(false);
   const [storedBytes, setStoredBytes] = useState<number | null>(null);
+
+  /** The module zone is set BEFORE dispatching, so the re-render that
+   * follows already formats in the new zone (no stale-label flash). */
+  const handleTimezoneChange = (value: string) => {
+    if (value === 'auto') {
+      const next = detectUserTimeZone();
+      setEffectiveTimeZone(next);
+      dispatch({ type: 'settings/setTimezone', mode: 'auto', zone: null, resolved: next });
+    } else {
+      setEffectiveTimeZone(value);
+      dispatch({ type: 'settings/setTimezone', mode: 'manual', zone: value, resolved: value });
+    }
+  };
 
   const refreshStoredSize = () => {
     try {
@@ -162,18 +183,41 @@ export default function SettingsPage() {
 
         <Section
           title="Timezone"
-          description="All times in HopFlow are shown in Tehran time, with a UTC equivalent where it matters."
+          description="All times in HopFlow are shown in your timezone — detected from your browser — with a UTC equivalent where it matters."
         >
           <div className="flex flex-wrap items-center gap-3">
             <span className="rounded-full bg-white/10 px-3 py-1 text-[13px] font-semibold text-white">
-              Tehran (GMT+3:30)
+              {formatZoneLabel(resolved, new Date())}
             </span>
             <span className="rounded-full bg-white/10 px-3 py-1 text-[13px] font-medium text-textMuted">
-              UTC +3:30 · no daylight saving time
+              {zoneObservesDst(resolved) ? 'Observes daylight saving time' : 'No daylight saving time'}
             </span>
           </div>
+          <label className="flex flex-col gap-1.5 text-[13px] font-medium text-white">
+            Timezone
+            <select
+              value={mode === 'auto' ? 'auto' : (zone ?? 'auto')}
+              onChange={(e) => handleTimezoneChange(e.target.value)}
+              className="h-[44px] rounded-xl border border-border bg-white/[0.03] px-3 text-[14px] text-white outline-none focus:border-solanaPurple"
+              aria-label="Timezone"
+            >
+              <option value="auto">
+                Automatic
+                {detected ? ` — detected: ${formatZoneLabel(detected, new Date())}` : ' (detected from your browser)'}
+              </option>
+              {TIMEZONE_CHOICES.map((c) => (
+                <option key={c.zone} value={c.zone}>
+                  {c.label} — {formatZoneLabel(c.zone, new Date())}
+                </option>
+              ))}
+            </select>
+          </label>
           <p className="text-[13px] leading-[20px] text-textMuted">
-            Times you pick (for example in the Route Builder) are read as Tehran wall time.
+            Times you pick (for example in the Route Builder) are read as wall time in this
+            timezone.
+            {mode === 'manual'
+              ? ' You picked this timezone manually — switch back to Automatic to follow your browser again.'
+              : ''}
           </p>
         </Section>
 

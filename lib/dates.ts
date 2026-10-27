@@ -2,6 +2,36 @@
  * They are called from server components too (e.g. SchedulePreviewCard),
  * so they must NOT live in the client DatePicker module. */
 
+import { DEFAULT_TIME_ZONE, formatZoneLabel, isValidTimeZone } from './timezone';
+
+/** --- Timezone display -------------------------------------------------
+ * HopFlow shows schedule times in the USER's timezone (Ali's 2026-10-28
+ * correction — never a hardcoded zone). The browser's local clock is NOT
+ * labelled — every displayed date/time carries its zone explicitly, so a
+ * reader never has to guess. The zone is DST-aware: the label's GMT
+ * offset is computed for the instant being shown, so a Helsinki user
+ * sees GMT+3 in summer and GMT+2 in winter.
+ *
+ * The formatters are pure functions called from server components too,
+ * so they cannot read React state. The effective zone therefore lives
+ * in this module: it starts at UTC (neutral SSR / first-render
+ * fallback) and the store sets the real zone after mount — the
+ * browser-detected zone, or the Settings override — via
+ * setEffectiveTimeZone. Server components render with the fallback;
+ * client components re-render with the resolved zone after mount. */
+let effectiveTimeZone = DEFAULT_TIME_ZONE;
+
+/** The zone the Tz formatters currently use. */
+export function getEffectiveTimeZone(): string {
+  return effectiveTimeZone;
+}
+
+/** Set the zone the Tz formatters use (called by the store after mount,
+ * and by the Settings page on change). Invalid zones are ignored. */
+export function setEffectiveTimeZone(zone: string): void {
+  if (isValidTimeZone(zone)) effectiveTimeZone = zone;
+}
+
 /** Parse a short date string like "Oct 28, 2026" (the format used across HopFlow). */
 export function parseShortDate(value: string): Date | null {
   const trimmed = value.trim();
@@ -20,21 +50,14 @@ export function formatLongDate(date: Date): string {
   return date.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
 }
 
-/** --- Timezone display -------------------------------------------------
- * HopFlow shows schedule times in Tehran time. The browser's local clock is
- * NOT labelled — every displayed date/time carries its zone explicitly, so a
- * reader never has to guess. Iran has no DST (abolished 2022), so Tehran is
- * a constant UTC+3:30. */
-export const DISPLAY_TIME_ZONE = 'Asia/Tehran';
-export const TEHRAN_TZ_LABEL = 'Tehran (GMT+3:30)';
-
-/** Tehran wall-clock parts of an instant (month name, day, year, HH:MM). */
-function tehranParts(
+/** Wall-clock parts of an instant in the user's timezone (month name,
+ * day, year, HH:MM). */
+function zoneParts(
   date: Date,
   monthStyle: 'long' | 'short' = 'long',
 ): { month: string; day: string; year: string; hh: string; mm: string } {
   const parts = new Intl.DateTimeFormat('en-US', {
-    timeZone: DISPLAY_TIME_ZONE,
+    timeZone: effectiveTimeZone,
     year: 'numeric',
     month: monthStyle,
     day: 'numeric',
@@ -55,17 +78,23 @@ function tehranParts(
   };
 }
 
-/** "November 1, 2026 · Tehran (GMT+3:30)" — the date in Tehran time, labelled. */
-export function formatLongDateTz(date: Date): string {
-  const p = tehranParts(date);
-  return `${p.month} ${p.day}, ${p.year} · ${TEHRAN_TZ_LABEL}`;
+/** The timezone label for an instant ("Tehran (GMT+3:30)" /
+ * "Helsinki (GMT+2)") — the offset follows DST. */
+function tzLabel(date: Date): string {
+  return formatZoneLabel(effectiveTimeZone, date);
 }
 
-/** "November 1, 2026 · 10:00 Tehran (GMT+3:30)" — date + time in Tehran time, labelled. */
+/** "November 1, 2026 · Helsinki (GMT+2)" — the date in the user's timezone, labelled. */
+export function formatLongDateTz(date: Date): string {
+  const p = zoneParts(date);
+  return `${p.month} ${p.day}, ${p.year} · ${tzLabel(date)}`;
+}
+
+/** "November 1, 2026 · 10:00 Helsinki (GMT+2)" — date + time in the user's timezone, labelled. */
 export function formatDateTimeTz(date: Date | null): string {
   if (!date) return '—';
-  const p = tehranParts(date);
-  return `${p.month} ${p.day}, ${p.year} · ${p.hh}:${p.mm} ${TEHRAN_TZ_LABEL}`;
+  const p = zoneParts(date);
+  return `${p.month} ${p.day}, ${p.year} · ${p.hh}:${p.mm} ${tzLabel(date)}`;
 }
 
 /** "November 1, 2026 · 06:30 UTC" — the UTC equivalent, for schedule/preview/tracking. */
@@ -82,25 +111,25 @@ export function formatDateTimeUtc(date: Date | null): string {
   return `${d} · ${hh}:${mm} UTC`;
 }
 
-/** "Oct 28, 2026 · Tehran (GMT+3:30)" — short date in Tehran time, labelled. */
+/** "Oct 28, 2026 · Helsinki (GMT+2)" — short date in the user's timezone, labelled. */
 export function formatShortDateTz(date: Date | null): string {
   if (!date) return '—';
-  const p = tehranParts(date, 'short');
-  return `${p.month} ${p.day}, ${p.year} · ${TEHRAN_TZ_LABEL}`;
+  const p = zoneParts(date, 'short');
+  return `${p.month} ${p.day}, ${p.year} · ${tzLabel(date)}`;
 }
 
-/** "09:00 Tehran (GMT+3:30)" — time of day in Tehran time, labelled. */
+/** "09:00 Helsinki (GMT+2)" — time of day in the user's timezone, labelled. */
 export function formatTimeTz(date: Date | null): string {
   if (!date) return '—';
-  const p = tehranParts(date);
-  return `${p.hh}:${p.mm} ${TEHRAN_TZ_LABEL}`;
+  const p = zoneParts(date);
+  return `${p.hh}:${p.mm} ${tzLabel(date)}`;
 }
 
-/** "Oct 28, 2026 · 09:00 Tehran (GMT+3:30)" — short date + time, labelled. */
+/** "Oct 28, 2026 · 09:00 Helsinki (GMT+2)" — short date + time, labelled. */
 export function formatShortDateTimeTz(date: Date | null): string {
   if (!date) return '—';
-  const p = tehranParts(date, 'short');
-  return `${p.month} ${p.day}, ${p.year} · ${p.hh}:${p.mm} ${TEHRAN_TZ_LABEL}`;
+  const p = zoneParts(date, 'short');
+  return `${p.month} ${p.day}, ${p.year} · ${p.hh}:${p.mm} ${tzLabel(date)}`;
 }
 
 /** Countdown to a future instant: "2h 14m" / "45m" / "3d 4h" / "Less than a minute". Past → "Overdue". */

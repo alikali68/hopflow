@@ -50,7 +50,8 @@ export default function DocsPage() {
           for it, and the app shows “At publish” for it. Every later hop runs at its own
           scheduled time (specific mode) or after its delay from the previous hop (relative
           mode). The wait between two hops must be between 20 seconds and 30 days. All times in
-          the app are shown in Tehran time (GMT+3:30), with a UTC equivalent where it matters.
+          the app are shown in your timezone — detected from your browser, with a UTC equivalent
+          where it matters. You can pick a different timezone in Settings.
         </InfoP>
 
         <InfoH2>The modules</InfoH2>

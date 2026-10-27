@@ -17,41 +17,50 @@
  *   delay-before-execution, not the first payload waitSeconds.
  */
 
-import { formatDateTimeTz, formatDateTimeUtc } from './dates';
+import { formatDateTimeTz, formatDateTimeUtc, getEffectiveTimeZone } from './dates';
+import { wallPartsToInstant, zoneWallParts } from './timezone';
 import type { HopDraft } from '../components/builder/builderData';
 import type { HopSchedule, ScheduleMode } from '../components/builder/scheduleData';
-
-/** Tehran is UTC+3:30 with no DST (abolished 2022) — the offset is constant. */
-export const TEHRAN_OFFSET_MINUTES = 210;
 
 export function isValidTime(value: string): boolean {
   return /^([01]\d|2[0-3]):[0-5]\d$/.test(value);
 }
 
+/**
+ * Add calendar days in the user's timezone: the wall time stays the
+ * same (a 10:00 hop stays 10:00 across a DST change), instead of adding
+ * a flat 24h which would shift the wall time by an hour.
+ */
 export function addDays(date: Date, days: number): Date {
-  const d = new Date(date);
-  d.setDate(d.getDate() + days);
-  return d;
+  const zone = getEffectiveTimeZone();
+  const p = zoneWallParts(zone, date);
+  return wallPartsToInstant(zone, { ...p, day: p.day + days });
 }
 
+/** Add hours in the user's timezone (wall-clock arithmetic). */
 export function addHours(date: Date, hours: number): Date {
-  const d = new Date(date);
-  d.setHours(d.getHours() + hours);
-  return d;
+  const zone = getEffectiveTimeZone();
+  const p = zoneWallParts(zone, date);
+  return wallPartsToInstant(zone, { ...p, hour: p.hour + hours });
 }
 
 /**
  * Combine a picked calendar date + 'HH:MM' into an instant, reading the
- * date+time as Tehran wall time. The Date's local calendar parts are the
- * picked day (the DatePicker hands back local midnight of the picked day).
+ * date+time as wall time in the user's timezone (browser-detected, or
+ * the Settings override — DST-aware). The picked calendar day is what
+ * the user saw on the DatePicker (the browser's local calendar); the
+ * wall time is read in the effective zone.
  */
 export function combineDateTime(date: Date, time: string): Date | null {
   if (!isValidTime(time)) return null;
   const [h, m] = time.split(':').map(Number);
-  const utcMs =
-    Date.UTC(date.getFullYear(), date.getMonth(), date.getDate(), h, m) -
-    TEHRAN_OFFSET_MINUTES * 60000;
-  return new Date(utcMs);
+  return wallPartsToInstant(getEffectiveTimeZone(), {
+    year: date.getFullYear(),
+    month: date.getMonth() + 1,
+    day: date.getDate(),
+    hour: h,
+    minute: m,
+  });
 }
 
 /**

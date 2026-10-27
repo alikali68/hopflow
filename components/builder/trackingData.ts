@@ -60,24 +60,38 @@ export function statusPillClass(tone: 'green' | 'purple' | 'red' | 'amber'): str
 // Demo route — the builder's seed route, NOT published yet. Shown only for id 'rt-1'.
 // Its hop dates are the illustrative seed dates (Nov 1/2/3) — a demo, not a
 // published route's executions (a real route's hop 0 runs at deploy).
+//
+// LAZY on purpose: the hop instants are computed from the picked wall
+// times in the user's timezone (combineDateTime reads the effective
+// zone), so they must be computed at render time — a module-level const
+// would freeze the SSR/first-render fallback zone (UTC) forever.
 export const DEMO_ROUTE_ID = 'rt-1';
 export interface DemoHop {
   address: string;
   scheduledAt: Date | null;
 }
-export const DEMO_ROUTE = {
-  id: DEMO_ROUTE_ID,
-  status: 'scheduled',
-  sourceOwner: SOURCE_WALLET,
-  amountTokens: PREVIEW_HOPS[0]?.amount ?? 0.1,
-  tokenSymbol: 'SOL',
-  hops: PREVIEW_HOPS.map((h, i) => {
-    const seed = SEED_SCHEDULES[i];
-    return {
-      address: h.wallet,
-      scheduledAt: seed ? combineDateTime(seed.date, seed.time) : null,
-    } as DemoHop;
-  }),
-};
+export function getDemoRoute(): {
+  id: string;
+  status: string;
+  sourceOwner: string;
+  amountTokens: number;
+  tokenSymbol: string;
+  hops: DemoHop[];
+} {
+  return {
+    id: DEMO_ROUTE_ID,
+    status: 'scheduled',
+    sourceOwner: SOURCE_WALLET,
+    amountTokens: PREVIEW_HOPS[0]?.amount ?? 0.1,
+    tokenSymbol: 'SOL',
+    hops: PREVIEW_HOPS.map((h, i) => {
+      const seed = SEED_SCHEDULES[i];
+      return {
+        address: h.wallet,
+        scheduledAt: seed ? combineDateTime(seed.date, seed.time) : null,
+      } as DemoHop;
+    }),
+  };
+}
 
 export { shortWallet, formatSol, formatDateTime };

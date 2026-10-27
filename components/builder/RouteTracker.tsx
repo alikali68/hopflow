@@ -8,7 +8,7 @@ import { useStore } from '@/lib/store';
 import { formatDateTimeUtc } from '@/lib/dates';
 import type { Transfer } from '@/lib/multihopper';
 import {
-  DEMO_ROUTE,
+  getDemoRoute,
   DEMO_ROUTE_ID,
   asApiRouteHops,
   routeProgress,
@@ -35,6 +35,11 @@ interface RouteTrackerProps {
 
 export default function RouteTracker({ id }: RouteTrackerProps) {
   const isDemo = id === DEMO_ROUTE_ID;
+
+  // The demo route is computed on every render (cheap: three wall-clock
+  // conversions) so its hop times always reflect the current effective
+  // timezone — a memo would freeze the zone it was first computed in.
+  const demoRoute = getDemoRoute();
 
   // Dashboard routes live in the store: a dashboard row click lands here
   // with its store id, and the sample view renders the same status the
@@ -150,13 +155,13 @@ export default function RouteTracker({ id }: RouteTrackerProps) {
   // The demo pill reads the store row's status (same source as the
   // dashboard), so a status change shows consistently on both pages.
   const currentStatus = isDemo
-    ? (storeRoute?.status ?? DEMO_ROUTE.status)
+    ? (storeRoute?.status ?? demoRoute.status)
     : record?.status ?? 'loading';
   const tone = statusTone(String(currentStatus).toLowerCase());
   const pillClasses = statusPillClass(tone);
 
-  const hopsData = isDemo ? DEMO_ROUTE.hops : liveHops;
-  const amountNumber = isDemo ? DEMO_ROUTE.amountTokens : Number(record?.amountTokens ?? 0);
+  const hopsData = isDemo ? demoRoute.hops : liveHops;
+  const amountNumber = isDemo ? demoRoute.amountTokens : Number(record?.amountTokens ?? 0);
   const lastExecutedHop = [...liveHops].reverse().find((h) => h.txSignature);
   // Extra API fields the lib's Transfer type doesn't declare (it has an
   // index signature, so they arrive as `unknown` — narrow them here).
@@ -205,7 +210,7 @@ export default function RouteTracker({ id }: RouteTrackerProps) {
 
         <p className="mt-2 text-[15px] text-[#9A9AB0]">
           {isDemo ? (
-            `Custom route · Created by ${shortWallet(DEMO_ROUTE.sourceOwner)} · Demo route — not published yet`
+            `Custom route · Created by ${shortWallet(demoRoute.sourceOwner)} · Demo route — not published yet`
           ) : record ? (
             `Custom route · Created by ${shortWallet(record.sourceOwner ?? '')} · ${
               record.createdAt ? formatDateTime(new Date(record.createdAt)) : ''
@@ -335,7 +340,7 @@ export default function RouteTracker({ id }: RouteTrackerProps) {
             <RouteTimeline
               hops={hopsData}
               amountTokens={amountNumber}
-              tokenSymbol={isDemo ? DEMO_ROUTE.tokenSymbol : 'SOL'}
+              tokenSymbol={isDemo ? demoRoute.tokenSymbol : 'SOL'}
             />
           </div>
 
@@ -397,13 +402,13 @@ export default function RouteTracker({ id }: RouteTrackerProps) {
                     <span className="text-[13.5px] text-[#9A9AB0]">Scheduled</span>
                     <span className="text-right">
                       <span className="block font-display text-[14px] font-bold text-white">
-                        {DEMO_ROUTE.hops[0]?.scheduledAt
-                          ? formatDateTime(DEMO_ROUTE.hops[0].scheduledAt)
+                        {demoRoute.hops[0]?.scheduledAt
+                          ? formatDateTime(demoRoute.hops[0].scheduledAt)
                           : '—'}
                       </span>
-                      {DEMO_ROUTE.hops[0]?.scheduledAt && (
+                      {demoRoute.hops[0]?.scheduledAt && (
                         <span className="mt-0.5 block text-[12px] font-medium text-[#5A5A6E]">
-                          {formatDateTimeUtc(DEMO_ROUTE.hops[0].scheduledAt)}
+                          {formatDateTimeUtc(demoRoute.hops[0].scheduledAt)}
                         </span>
                       )}
                     </span>

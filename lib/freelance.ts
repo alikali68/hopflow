@@ -17,13 +17,13 @@
  *   creations are recorded in the app. No invented tx hash, no
  *   "on-chain" wording anywhere in this module.
  *
- * TIMEZONE (Ali's 2026-10-28 correction): the app must use the USER's
+ * TIMEZONE (Ali's 2026-10-28 correction): the app uses the USER's
  * detected timezone, not hardcoded Tehran. This file only CALLS the
- * existing tz helpers (formatShortDateTz / formatDateTimeTz /
- * formatDateTimeUtc in lib/dates.ts) — it adds no new Tehran-hardcoded
- * code. A dedicated fix pass reworks those helpers to the detected zone
- * (with a Settings override); every display below picks it up
- * automatically. UTC equivalents are kept where it matters.
+ * tz helpers (formatShortDateTz / formatDateTimeTz /
+ * formatDateTimeUtc in lib/dates.ts) — the helpers format in the
+ * effective zone (detected, or the Settings override) and every display
+ * below picks it up automatically. UTC equivalents are kept where it
+ * matters.
  * Milestone instants are stored as ISO strings; the draft wizard's
  * date-only due values are combined with '10:00' via the existing
  * combineDateTime helper (route-time) when a project is created.
@@ -128,8 +128,9 @@ export function shortWallet(wallet: string): string {
   return `${wallet.slice(0, 4)}...${wallet.slice(-4)}`;
 }
 
-/** 10:00 wall time as an ISO instant (Tehran helper — see the timezone
- * note at the top; the instant itself is what the seed means). */
+/** Seed instants authored as 10:00 wall time in the zone the seed was
+ * written in (Tehran, UTC+3:30 → T06:30:00.000Z). The ISO instant is
+ * what the seed means; displays render it in the user's timezone. */
 const at10 = (isoDate: string): string => `${isoDate}T06:30:00.000Z`;
 
 /* ── Seed ──────────────────────────────────────────────────────── */

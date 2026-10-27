@@ -44,7 +44,7 @@ export function computeExecutionDates(
   return computeExecutionTimes(mode, hops, schedules, new Date());
 }
 
-/** Date + time in Tehran time, with its timezone label. */
+/** Date + time in the user's timezone, with its label. */
 export function formatDateTime(date: Date | null): string {
   return formatDateTimeTz(date);
 }

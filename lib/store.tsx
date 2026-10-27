@@ -25,6 +25,7 @@ import React, {
   useMemo,
   useReducer,
   useRef,
+  useState,
 } from 'react';
 import { SEED_HOPS, type HopDraft } from '@/components/builder/builderData';
 import {
@@ -53,8 +54,14 @@ import {
   type FreelanceProject,
   type FreelanceDraft,
 } from './freelance';
-import { parseShortDate } from './dates';
+import { parseShortDate, setEffectiveTimeZone } from './dates';
 import { combineDateTime } from './route-time';
+import {
+  DEFAULT_TIME_ZONE,
+  detectUserTimeZone,
+  isValidTimeZone,
+  resolveTimezonePreference,
+} from './timezone';
 
 export const STORE_KEY = 'hopflow-store-v1';
 export const STORE_VERSION = 1;
@@ -75,6 +82,21 @@ export interface FreelanceState {
   projects: FreelanceProject[];
   /** The in-progress create-wizard draft (all three steps share it). */
   draft: FreelanceDraft;
+}
+
+export interface TimezoneSettings {
+  /** 'auto' = the browser-detected zone; 'manual' = the chosen zone. */
+  mode: 'auto' | 'manual';
+  /** The manually chosen IANA zone when mode is 'manual'; null in auto. */
+  zone: string | null;
+  /** The zone actually used for display and math. 'UTC' until the first
+   * client-side resolution after mount (SSR-safe seed — the server
+   * cannot know the user's zone). */
+  resolved: string;
+}
+
+export interface AppSettings {
+  timezone: TimezoneSettings;
 }
 
 export interface AppState {
@@ -98,7 +120,10 @@ export interface AppState {
    * refund requests are recorded here (in-app only — there is no
    * on-chain escrow settlement in this beta). */
   freelance: FreelanceState;
-  // Later M4 steps add: payroll, vesting, settings.
+  /** User settings — timezone for now (payroll, vesting slices land in
+   * later M4 steps). */
+  settings: AppSettings;
+  // Later M4 steps add: payroll, vesting.
 }
 
 export type StoreAction =
@@ -118,6 +143,13 @@ export type StoreAction =
   | { type: 'freelance/createProject' }
   | { type: 'freelance/claimRefund'; projectId: string }
   | { type: 'freelance/cancelProject'; projectId: string }
+  /** Timezone preference change (Settings). `resolved` is computed by
+   * the caller (handler/effect) and the module zone is set BEFORE
+   * dispatching, so the re-render already formats in the new zone. */
+  | { type: 'settings/setTimezone'; mode: 'auto' | 'manual'; zone: string | null; resolved: string }
+  /** Zone resolution after mount (the mount effect computes it from the
+   * stored preference and sets the module zone before dispatching). */
+  | { type: 'settings/resolveTimezone'; resolved: string }
   | { type: 'hydrate'; state: AppState };
 
 function seedBuilderState(): BuilderState {
@@ -138,6 +170,10 @@ function seedFreelanceState(): FreelanceState {
   };
 }
 
+function seedSettings(): AppSettings {
+  return { timezone: { mode: 'auto', zone: null, resolved: DEFAULT_TIME_ZONE } };
+}
+
 function seedAppState(): AppState {
   return {
     version: STORE_VERSION,
@@ -146,6 +182,7 @@ function seedAppState(): AppState {
     routes: seedStoreRoutes(),
     activity: seedActivity(),
     freelance: seedFreelanceState(),
+    settings: seedSettings(),
   };
 }
 
@@ -471,6 +508,37 @@ function reducer(state: AppState, action: StoreAction): AppState {
       // the localStorage key; the persist effect then stores the seed state).
       return seedAppState();
     }
+    case 'settings/setTimezone': {
+      const zone =
+        action.mode === 'manual' && action.zone && isValidTimeZone(action.zone)
+          ? action.zone
+          : null;
+      const mode = action.mode === 'manual' && zone ? 'manual' : 'auto';
+      const resolved = isValidTimeZone(action.resolved)
+        ? action.resolved
+        : DEFAULT_TIME_ZONE;
+      const tz = state.settings.timezone;
+      if (tz.mode === mode && tz.zone === zone && tz.resolved === resolved) return state;
+      // Execution instants depend on the zone — re-derive the builder
+      // draft row so the dashboard never shows a stale zone's times.
+      // (The caller set the module zone before dispatching.)
+      return {
+        ...state,
+        settings: { timezone: { mode, zone, resolved } },
+        routes: syncBuilderRoute(state.routes, state.builder.hops, state.builder.schedules, state.builder.mode),
+      };
+    }
+    case 'settings/resolveTimezone': {
+      const resolved = isValidTimeZone(action.resolved)
+        ? action.resolved
+        : DEFAULT_TIME_ZONE;
+      if (state.settings.timezone.resolved === resolved) return state;
+      return {
+        ...state,
+        settings: { timezone: { ...state.settings.timezone, resolved } },
+        routes: syncBuilderRoute(state.routes, state.builder.hops, state.builder.schedules, state.builder.mode),
+      };
+    }
     default:
       return state;
   }
@@ -601,6 +669,17 @@ function isValidStoredState(value: unknown): value is AppState {
       return false;
     }
   }
+  // settings is optional (states saved before the timezone fix lack it)
+  // — but when present it must be well-shaped.
+  if (v.settings !== undefined) {
+    const s = v.settings as Record<string, unknown>;
+    if (!s || typeof s !== 'object') return false;
+    const tz = s.timezone as Record<string, unknown> | undefined;
+    if (!tz || typeof tz !== 'object') return false;
+    if (tz.mode !== 'auto' && tz.mode !== 'manual') return false;
+    if (tz.zone !== null && (typeof tz.zone !== 'string' || !isValidTimeZone(tz.zone))) return false;
+    if (typeof tz.resolved !== 'string' || !isValidTimeZone(tz.resolved)) return false;
+  }
   return true;
 }
 
@@ -642,6 +721,19 @@ function reviveStoredState(parsed: AppState): AppState {
           },
         }
       : seedFreelanceState(),
+    // Pre-timezone-fix states have no settings — seed them (auto mode,
+    // resolved after mount by the resolve effect).
+    settings: parsed.settings
+      ? {
+          timezone: {
+            mode: parsed.settings.timezone.mode,
+            zone: parsed.settings.timezone.zone,
+            resolved: isValidTimeZone(parsed.settings.timezone.resolved)
+              ? parsed.settings.timezone.resolved
+              : DEFAULT_TIME_ZONE,
+          },
+        }
+      : seedSettings(),
   };
 }
 
@@ -658,13 +750,45 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       if (raw) {
         const parsed: unknown = JSON.parse(raw);
         if (isValidStoredState(parsed)) {
-          dispatch({ type: 'hydrate', state: reviveStoredState(parsed) });
+          const stored = reviveStoredState(parsed);
+          // Resolve the zone BEFORE dispatching, so the re-render that
+          // follows already formats in the right zone. Auto mode re-detects
+          // on every load (the user may have travelled since last visit).
+          const resolved = resolveTimezonePreference(
+            stored.settings.timezone.mode,
+            stored.settings.timezone.zone,
+          );
+          setEffectiveTimeZone(resolved);
+          dispatch({
+            type: 'hydrate',
+            state: {
+              ...stored,
+              settings: { timezone: { ...stored.settings.timezone, resolved } },
+            },
+          });
         }
       }
     } catch {
       // Corrupted stored state: keep the seed state.
     }
   }, []);
+
+  // Resolve the effective timezone whenever the stored preference
+  // changes (fresh visit with no stored state, "Clear saved data",
+  // "Reset demo data"). The Settings handler sets the module zone
+  // synchronously before dispatching, so for its changes this effect is
+  // a no-op — it only covers the cases no handler runs for.
+  const tzMode = state.settings.timezone.mode;
+  const tzZone = state.settings.timezone.zone;
+  const tzResolved = state.settings.timezone.resolved;
+  useEffect(() => {
+    const resolved = resolveTimezonePreference(tzMode, tzZone);
+    setEffectiveTimeZone(resolved);
+    if (resolved !== tzResolved) {
+      dispatch({ type: 'settings/resolveTimezone', resolved });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tzMode, tzZone]);
 
   // Persist every change. The first run is skipped so the seed state never
   // overwrites stored state before hydration has had a chance to read it.
@@ -688,6 +812,24 @@ export function useStore(): { state: AppState; dispatch: React.Dispatch<StoreAct
   const ctx = useContext(StoreContext);
   if (!ctx) throw new Error('useStore must be used inside StoreProvider');
   return ctx;
+}
+
+/** The timezone setting (preference + resolved zone + detected zone).
+ * `detected` is computed after mount only, so the first render matches
+ * the server HTML (no hydration mismatch). */
+export function useTimezone(): {
+  mode: 'auto' | 'manual';
+  zone: string | null;
+  resolved: string;
+  detected: string | null;
+  dispatch: React.Dispatch<StoreAction>;
+} {
+  const { state, dispatch } = useStore();
+  const [detected, setDetected] = useState<string | null>(null);
+  useEffect(() => {
+    setDetected(detectUserTimeZone());
+  }, []);
+  return { ...state.settings.timezone, detected, dispatch };
 }
 
 /** The freelance slice (escrow list, detail, end, create draft). */
@@ -724,9 +866,15 @@ export function useBuilderRoute(): {
 } {
   const { state, dispatch } = useStore();
   const builder = state.builder;
+  // Execution instants depend on the effective timezone (combineDateTime
+  // reads the picked wall time in the user's zone), so the resolved zone
+  // is a memo dep — without it, switching zones in Settings would leave
+  // the preview showing the previous zone's instants.
+  const tzResolved = state.settings.timezone.resolved;
   const executions = useMemo(
     () => computeExecutionTimes(builder.mode, builder.hops, builder.schedules, new Date()),
-    [builder],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [builder, tzResolved],
   );
   return {
     hops: builder.hops,

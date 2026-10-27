@@ -1,3 +1,5 @@
+'use client';
+
 import React from 'react';
 import { HopDraft, shortWallet } from './builderData';
 import { formatExecutionLabel, formatDateTimeTz, formatDateTimeUtc } from '@/lib/route-time';

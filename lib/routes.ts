@@ -16,8 +16,9 @@
  *   real when the module slices land in later M4 steps. The rows are
  *   sample data and the dashboard says so.
  * - The old seed gave route-2 a next hop of "Oct 25, 12:00" — already in
- *   the past on Oct 27. It is corrected forward to Nov 1, 12:00 Tehran,
- *   the payroll module's next payout date.
+ *   the past on Oct 27. It is corrected forward to Nov 1, 12:00 (the
+ *   payroll module's next payout date) — the seed instant is 08:30 UTC.
+ *   Displays render seed instants in the user's timezone.
  */
 
 import { ROUTES } from '@/components/data';
@@ -51,9 +52,11 @@ export interface StoreRoute {
 /** The builder draft's dashboard row / tracking id (the demo route). */
 export const BUILDER_ROUTE_ID = 'rt-1';
 
-/** Next-execution seed per old ROUTES row (ISO instants, Tehran wall time).
- * route-1 "Tomorrow, 09:00" → Oct 28, 2026 09:00 Tehran.
- * route-2 "Oct 25, 12:00" was already past — corrected to Nov 1, 12:00 Tehran.
+/** Next-execution seed per old ROUTES row (ISO instants; authored as
+ * Tehran wall time — route-1 "Tomorrow, 09:00" → Oct 28, 2026 09:00
+ * Tehran = 05:30 UTC; route-2 "Oct 25, 12:00" was already past —
+ * corrected to Nov 1, 12:00 Tehran = 08:30 UTC. Displays render these
+ * instants in the user's timezone.)
  * route-3 is Completed → no next execution. */
 function seedNextExecution(id: string): string | null {
   if (id === 'route-1') return '2026-10-28T05:30:00.000Z';
