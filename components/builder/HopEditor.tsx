@@ -14,6 +14,44 @@ import { PlusIcon, ChevronRightIcon } from '@/components/icons';
 
 export default function HopEditor() {
   const [hops, setHops] = useState<HopDraft[]>(SEED_HOPS);
+  const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
+  const [dropIndex, setDropIndex] = useState<number | null>(null);
+
+  // D3: native HTML5 drag-and-drop reorder (no new dependencies).
+  const handleDragOver = (index: number) => (e: React.DragEvent) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    if (draggedIndex === null) return;
+    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    const after = e.clientY > rect.top + rect.height / 2;
+    const target = after ? index + 1 : index;
+    // Dropping on the dragged row itself (or right after it) is a no-op.
+    setDropIndex(target === draggedIndex || target === draggedIndex + 1 ? null : target);
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    const target = dropIndex;
+    if (draggedIndex === null || target === null) {
+      setDraggedIndex(null);
+      setDropIndex(null);
+      return;
+    }
+    setHops((prev) => {
+      const next = [...prev];
+      const [moved] = next.splice(draggedIndex, 1);
+      const insertAt = draggedIndex < target ? target - 1 : target;
+      next.splice(insertAt, 0, moved);
+      return next;
+    });
+    setDraggedIndex(null);
+    setDropIndex(null);
+  };
+
+  const handleDragEnd = () => {
+    setDraggedIndex(null);
+    setDropIndex(null);
+  };
 
   const updateHop = (id: string, patch: Partial<HopDraft>) => {
     setHops((prev) => prev.map((h) => (h.id === id ? { ...h, ...patch } : h)));
@@ -68,16 +106,34 @@ export default function HopEditor() {
           {/* Rows List */}
           <div className="mt-4 flex flex-col">
             {hops.map((hop, i) => (
-              <HopRow
-                key={hop.id}
-                index={i}
-                hop={hop}
-                onChange={(patch) => updateHop(hop.id, patch)}
-                onDuplicate={() => duplicateHop(hop.id)}
-                onRemove={() => removeHop(hop.id)}
-                canRemove={hops.length > MIN_HOPS}
-              />
+              <React.Fragment key={hop.id}>
+                {dropIndex === i && (
+                  <div
+                    className="h-[2px] rounded-full bg-gradient-to-r from-[#9945FF] to-[#14F195]"
+                    aria-hidden="true"
+                  />
+                )}
+                <HopRow
+                  index={i}
+                  hop={hop}
+                  onChange={(patch) => updateHop(hop.id, patch)}
+                  onDuplicate={() => duplicateHop(hop.id)}
+                  onRemove={() => removeHop(hop.id)}
+                  canRemove={hops.length > MIN_HOPS}
+                  isDragging={draggedIndex === i}
+                  onDragStart={() => setDraggedIndex(i)}
+                  onDragOver={handleDragOver(i)}
+                  onDrop={handleDrop}
+                  onDragEnd={handleDragEnd}
+                />
+              </React.Fragment>
             ))}
+            {dropIndex === hops.length && (
+              <div
+                className="h-[2px] rounded-full bg-gradient-to-r from-[#9945FF] to-[#14F195]"
+                aria-hidden="true"
+              />
+            )}
           </div>
 
           {/* Add Hop Button */}

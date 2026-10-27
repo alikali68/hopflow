@@ -16,6 +16,11 @@ interface HopRowProps {
   onDuplicate: () => void;
   onRemove: () => void;
   canRemove: boolean;
+  isDragging: boolean;
+  onDragStart: () => void;
+  onDragOver: (e: React.DragEvent) => void;
+  onDrop: (e: React.DragEvent) => void;
+  onDragEnd: () => void;
 }
 
 export default function HopRow({
@@ -25,16 +30,41 @@ export default function HopRow({
   onDuplicate,
   onRemove,
   canRemove,
+  isDragging,
+  onDragStart,
+  onDragOver,
+  onDrop,
+  onDragEnd,
 }: HopRowProps) {
   const isWalletNotEmpty = hop.wallet.trim().length > 0;
   const isWalletValid = isValidSolanaAddress(hop.wallet);
 
+  const handleDragStart = (e: React.DragEvent) => {
+    // Don't start a drag from inputs, buttons or links — only from the row/grip.
+    if ((e.target as HTMLElement).closest('input, button, a, select, textarea')) {
+      e.preventDefault();
+      return;
+    }
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', String(index));
+    onDragStart();
+  };
+
   return (
-    <div className="flex flex-wrap items-center gap-3 border-b border-white/[0.06] py-4 first:pt-0 last:border-b-0 last:pb-0">
-      {/* Drag handle: D3: drag-and-drop reordering */}
+    <div
+      draggable
+      onDragStart={handleDragStart}
+      onDragOver={onDragOver}
+      onDrop={onDrop}
+      onDragEnd={onDragEnd}
+      className={`flex flex-wrap items-center gap-3 border-b border-white/[0.06] py-4 first:pt-0 last:border-b-0 last:pb-0 ${
+        isDragging ? 'opacity-40' : ''
+      }`}
+    >
+      {/* Drag handle — D3: drag the row to reorder */}
       <span
-        className="flex h-8 w-6 shrink-0 cursor-grab items-center justify-center text-[#5A5A6E] transition-colors hover:text-white"
-        title="Drag to reorder — coming in D3"
+        className="flex h-8 w-6 shrink-0 cursor-grab items-center justify-center text-[#5A5A6E] transition-colors hover:text-white active:cursor-grabbing"
+        title="Drag to reorder"
       >
         <GripIcon size={18} />
       </span>
