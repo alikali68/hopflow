@@ -11,12 +11,12 @@ export default function EmptyState() {
       <p className="mt-1 text-[13px] text-[#9A9AB0]">
         Create your first automated payment route in under a minute.
       </p>
-      <button
-        type="button"
+      <a
+        href="/builder"
         className="mt-5 flex h-[40px] items-center gap-2 rounded-xl bg-gradient-to-r from-[#9945FF] to-[#14F195] px-4 text-[13px] font-bold text-white shadow-md transition-all hover:brightness-110 active:scale-95"
       >
         Create a route
-      </button>
+      </a>
     </div>
   );
 }

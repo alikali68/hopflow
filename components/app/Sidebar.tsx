@@ -21,7 +21,7 @@ const NAV = [
   { label: 'Team Payroll', href: '/payroll', icon: <UsersIcon size={20} variant="current" /> },
   { label: 'Token Vesting', href: '/vesting', icon: <HourglassIcon size={18} /> },
   { label: 'Route Builder', href: '/builder', icon: <NodesIcon size={18} variant="current" /> },
-  { label: 'Route Tracking', href: '/routes/rt-1', icon: <PulseIcon size={18} /> },
+  { label: 'Route Tracking', href: '/routes', icon: <PulseIcon size={18} /> },
   { label: 'Settings', href: '/settings', icon: <SettingsIcon size={18} /> },
 ];
 

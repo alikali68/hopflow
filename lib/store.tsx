@@ -34,6 +34,14 @@ import {
   type ScheduleMode,
 } from '@/components/builder/scheduleData';
 import { computeExecutionTimes } from './route-time';
+import {
+  seedStoreRoutes,
+  seedActivity,
+  syncBuilderRoute,
+  type StoreRoute,
+  type RouteStatus,
+  type ActivityEntry,
+} from './routes';
 
 export const STORE_KEY = 'hopflow-store-v1';
 export const STORE_VERSION = 1;
@@ -60,7 +68,13 @@ export interface AppState {
    * the modules are wired to real data in later M4 steps.
    */
   demoMode: boolean;
-  // Later M4 steps add: routes, freelance, payroll, vesting, settings.
+  /** Dashboard routes ("My Routes") — the single source of truth for the
+   * dashboard, the routes list page and the tracking sample view. */
+  routes: StoreRoute[];
+  /** Recent activity — seeded with labelled samples; real actions
+   * (draft saved, route paused/resumed) append real entries. */
+  activity: ActivityEntry[];
+  // Later M4 steps add: freelance, payroll, vesting, settings.
 }
 
 export type StoreAction =
@@ -71,6 +85,8 @@ export type StoreAction =
   | { type: 'builder/resetToSeed' }
   | { type: 'session/setDemoMode'; demoMode: boolean }
   | { type: 'session/resetAll' }
+  | { type: 'routes/setStatus'; id: string; status: RouteStatus }
+  | { type: 'routes/resetToSeed' }
   | { type: 'hydrate'; state: AppState };
 
 function seedBuilderState(): BuilderState {
@@ -85,7 +101,13 @@ function seedBuilderState(): BuilderState {
 }
 
 function seedAppState(): AppState {
-  return { version: STORE_VERSION, builder: seedBuilderState(), demoMode: false };
+  return {
+    version: STORE_VERSION,
+    builder: seedBuilderState(),
+    demoMode: false,
+    routes: seedStoreRoutes(),
+    activity: seedActivity(),
+  };
 }
 
 /** Every hop needs a schedule — fill in defaults for hops that lack one (new/added hops), drop the rest. */
@@ -105,35 +127,57 @@ function syncSchedules(hops: HopDraft[], schedules: HopSchedule[]): HopSchedule[
   });
 }
 
+/** Prepend an activity entry (newest first), capped at 20. */
+function appendActivity(
+  activity: ActivityEntry[],
+  text: string,
+  tone: ActivityEntry['tone'],
+): ActivityEntry[] {
+  const entry: ActivityEntry = {
+    id: `act-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    text,
+    at: new Date().toISOString(),
+    sample: false,
+    tone,
+  };
+  return [entry, ...activity].slice(0, 20);
+}
+
 function reducer(state: AppState, action: StoreAction): AppState {
   switch (action.type) {
     case 'hydrate':
       return action.state;
     case 'builder/setHops': {
       const b = state.builder;
+      const nextBuilder = {
+        ...b,
+        hops: action.hops,
+        schedules: syncSchedules(action.hops, b.schedules),
+        builderVersion: b.builderVersion + 1,
+      };
       return {
         ...state,
-        builder: {
-          ...b,
-          hops: action.hops,
-          schedules: syncSchedules(action.hops, b.schedules),
-          builderVersion: b.builderVersion + 1,
-        },
+        builder: nextBuilder,
+        routes: syncBuilderRoute(state.routes, nextBuilder.hops, nextBuilder.schedules, nextBuilder.mode),
       };
     }
     case 'builder/setSchedules': {
       const b = state.builder;
+      const nextBuilder = { ...b, schedules: action.schedules, builderVersion: b.builderVersion + 1 };
       return {
         ...state,
-        builder: { ...b, schedules: action.schedules, builderVersion: b.builderVersion + 1 },
+        builder: nextBuilder,
+        routes: syncBuilderRoute(state.routes, nextBuilder.hops, nextBuilder.schedules, nextBuilder.mode),
       };
     }
     case 'builder/setMode': {
       const b = state.builder;
       if (b.mode === action.mode) return state;
+      const nextBuilder = { ...b, mode: action.mode, builderVersion: b.builderVersion + 1 };
       return {
         ...state,
-        builder: { ...b, mode: action.mode, builderVersion: b.builderVersion + 1 },
+        builder: nextBuilder,
+        routes: syncBuilderRoute(state.routes, nextBuilder.hops, nextBuilder.schedules, nextBuilder.mode),
       };
     }
     case 'builder/saveDraft': {
@@ -145,11 +189,41 @@ function reducer(state: AppState, action: StoreAction): AppState {
           draftSavedAt: new Date().toISOString(),
           draftSavedVersion: b.builderVersion,
         },
+        activity: appendActivity(state.activity, 'Builder draft saved', 'purple'),
       };
     }
     case 'builder/resetToSeed': {
       // "Reset demo data": builder draft back to seed + exit demo mode.
-      return { ...state, builder: seedBuilderState(), demoMode: false };
+      // The routes list and activity log are sample data too — they reset
+      // to seed as well so the whole app is coherent again.
+      return {
+        ...state,
+        builder: seedBuilderState(),
+        demoMode: false,
+        routes: seedStoreRoutes(),
+        activity: seedActivity(),
+      };
+    }
+    case 'routes/setStatus': {
+      const route = state.routes.find((r) => r.id === action.id);
+      if (!route || route.status === action.status) return state;
+      const text =
+        action.status === 'Paused'
+          ? `Route '${route.name}' paused`
+          : action.status === 'Active'
+            ? `Route '${route.name}' resumed`
+            : `Route '${route.name}' marked ${action.status.toLowerCase()}`;
+      const tone: ActivityEntry['tone'] = action.status === 'Paused' ? 'amber' : 'green';
+      return {
+        ...state,
+        routes: state.routes.map((r) =>
+          r.id === action.id ? { ...r, status: action.status } : r,
+        ),
+        activity: appendActivity(state.activity, text, tone),
+      };
+    }
+    case 'routes/resetToSeed': {
+      return { ...state, routes: seedStoreRoutes() };
     }
     case 'session/setDemoMode': {
       if (state.demoMode === action.demoMode) return state;
@@ -207,6 +281,46 @@ function isValidStoredState(value: unknown): value is AppState {
   // demoMode is optional (states saved before step 2 lack it) — but when
   // present it must be a boolean.
   if (v.demoMode !== undefined && typeof v.demoMode !== 'boolean') return false;
+  // routes / activity are optional (states saved before step 3 lack them)
+  // — but when present they must be well-shaped arrays.
+  if (v.routes !== undefined) {
+    if (!Array.isArray(v.routes)) return false;
+    const ok = (v.routes as unknown[]).every((r) => {
+      if (!r || typeof r !== 'object') return false;
+      const o = r as Record<string, unknown>;
+      return (
+        typeof o.id === 'string' &&
+        typeof o.name === 'string' &&
+        (o.type === 'Escrow' || o.type === 'Payroll' || o.type === 'Vesting' || o.type === 'Custom') &&
+        typeof o.amount === 'number' &&
+        (o.token === 'SOL' || o.token === 'USDC') &&
+        typeof o.hopsExecuted === 'number' &&
+        typeof o.totalHops === 'number' &&
+        (o.status === 'Active' || o.status === 'Paused' || o.status === 'Scheduled' || o.status === 'Completed') &&
+        (o.nextExecutionAt === null || typeof o.nextExecutionAt === 'string') &&
+        typeof o.live === 'boolean' &&
+        typeof o.moduleHref === 'string' &&
+        Array.isArray(o.wallets)
+      );
+    });
+    if (!ok) return false;
+  }
+  if (v.activity !== undefined) {
+    if (!Array.isArray(v.activity)) return false;
+    const ok = (v.activity as unknown[]).every((a) => {
+      if (!a || typeof a !== 'object') return false;
+      const o = a as Record<string, unknown>;
+      return (
+        typeof o.id === 'string' &&
+        typeof o.text === 'string' &&
+        typeof o.at === 'string' &&
+        !Number.isNaN(new Date(o.at).getTime()) &&
+        typeof o.sample === 'boolean' &&
+        (o.tone === 'green' || o.tone === 'purple' || o.tone === 'amber' || o.tone === 'cyan')
+      );
+    });
+    if (!ok) return false;
+  }
   return true;
 }
 
@@ -226,6 +340,14 @@ function reviveStoredState(parsed: AppState): AppState {
       builderVersion: parsed.builder.builderVersion,
     },
     demoMode: typeof parsed.demoMode === 'boolean' ? parsed.demoMode : false,
+    // Pre-step-3 states have no routes/activity — seed them (the validator
+    // already checked the shape when they are present).
+    routes: Array.isArray(parsed.routes)
+      ? parsed.routes.map((r) => ({ ...r, wallets: [...(r.wallets ?? [])] }))
+      : seedStoreRoutes(),
+    activity: Array.isArray(parsed.activity)
+      ? parsed.activity.map((a) => ({ ...a }))
+      : seedActivity(),
   };
 }
 
@@ -272,6 +394,17 @@ export function useStore(): { state: AppState; dispatch: React.Dispatch<StoreAct
   const ctx = useContext(StoreContext);
   if (!ctx) throw new Error('useStore must be used inside StoreProvider');
   return ctx;
+}
+
+/** The routes slice (dashboard list, routes list page, tracking sample
+ * view) plus the activity log. */
+export function useRoutes(): {
+  routes: StoreRoute[];
+  activity: ActivityEntry[];
+  dispatch: React.Dispatch<StoreAction>;
+} {
+  const { state, dispatch } = useStore();
+  return { routes: state.routes, activity: state.activity, dispatch };
 }
 
 /** The builder slice plus truthful per-hop execution times (hop 0 = deploy). */

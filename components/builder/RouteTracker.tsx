@@ -4,6 +4,7 @@ import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { useWallet } from '@solana/wallet-adapter-react';
 import { WalletMultiButton } from '@solana/wallet-adapter-react-ui';
 import { signAuthMessage, authHeaders, type WalletAuth } from '@/lib/client-auth';
+import { useStore } from '@/lib/store';
 import { formatDateTimeUtc } from '@/lib/dates';
 import type { Transfer } from '@/lib/multihopper';
 import {
@@ -19,6 +20,7 @@ import {
   explorerTxUrl,
 } from './trackingData';
 import RouteTimeline from './RouteTimeline';
+import SampleRouteView from './SampleRouteView';
 import {
   AlertIcon,
   LockIcon,
@@ -33,6 +35,13 @@ interface RouteTrackerProps {
 
 export default function RouteTracker({ id }: RouteTrackerProps) {
   const isDemo = id === DEMO_ROUTE_ID;
+
+  // Dashboard routes live in the store: a dashboard row click lands here
+  // with its store id, and the sample view renders the same status the
+  // dashboard shows (pausing on the dashboard flips the pill here too).
+  const { state: storeState } = useStore();
+  const storeRoute = storeState.routes.find((r) => r.id === id);
+  const isStoreRoute = !!storeRoute && !isDemo;
 
   const { publicKey, signMessage, connected } = useWallet();
   const authSigningRef = useRef(false);
@@ -138,8 +147,12 @@ export default function RouteTracker({ id }: RouteTrackerProps) {
   // Live data resolution
   const liveHops = record ? asApiRouteHops(record) : [];
   const progress = record ? routeProgress(record) : null;
-  const currentStatus = isDemo ? DEMO_ROUTE.status : record?.status ?? 'loading';
-  const tone = statusTone(currentStatus);
+  // The demo pill reads the store row's status (same source as the
+  // dashboard), so a status change shows consistently on both pages.
+  const currentStatus = isDemo
+    ? (storeRoute?.status ?? DEMO_ROUTE.status)
+    : record?.status ?? 'loading';
+  const tone = statusTone(String(currentStatus).toLowerCase());
   const pillClasses = statusPillClass(tone);
 
   const hopsData = isDemo ? DEMO_ROUTE.hops : liveHops;
@@ -160,6 +173,12 @@ export default function RouteTracker({ id }: RouteTrackerProps) {
     recordExtra && typeof recordExtra.completedAt === 'string'
       ? recordExtra.completedAt
       : null;
+
+  // Sample routes from the dashboard render their own view (same status as
+  // the dashboard row). Live ids fall through to the wallet-gated fetch.
+  if (isStoreRoute && storeRoute) {
+    return <SampleRouteView route={storeRoute} />;
+  }
 
   return (
     <div className="flex flex-col gap-6">

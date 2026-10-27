@@ -1,32 +1,30 @@
 import React from 'react';
 import {
-  DASHBOARD_STATS,
   ESCROW_PROJECTS_CLIENT,
   ESCROW_PROJECTS_FREELANCER,
   type StatItem,
 } from './data';
+import { seedStoreRoutes, computeRouteStats } from '@/lib/routes';
 import { TrendArrowIcon } from './icons';
 
 // Honest stats: derived from the app's own seed data, NOT live platform
 // numbers. The old strip claimed "1,240+ routes / 8.6M USDC / 3,900 users"
-// — nothing in the app counted those. These values come from the same seed
-// data the dashboard shows (DASHBOARD_STATS headline counts + the escrow
-// project lists), and the strip is labelled as sample data below.
-// Known remaining gap (audit S7, step 3): the dashboard headline says 12
-// routes while only 3 route rows are listed — the strip reuses the headline
-// count so landing and dashboard agree until that is reconciled.
-const routesStat = DASHBOARD_STATS.find((s) => s.id === 'total-routes');
-const volumeStat = DASHBOARD_STATS.find((s) => s.id === 'total-volume');
+// — nothing in the app counted those. These values come from the same
+// routes slice the dashboard computes from (seed state), so landing and
+// dashboard agree, and the strip is labelled as sample data below.
+// (Audit S7, resolved in step 3: the dashboard headline now equals the
+// listed rows, and the strip uses the same computation.)
+const routeStats = computeRouteStats(seedStoreRoutes(), new Date());
 
 const STATS: StatItem[] = [
   {
-    value: routesStat?.value ?? '—',
+    value: String(routeStats.totalRoutes),
     label: 'Routes created',
     isGradient: true,
     hasTrend: true,
   },
   {
-    value: volumeStat ? volumeStat.value.replace(' USDC', '') : '—',
+    value: routeStats.totalVolumeUsdc.toLocaleString('en-US'),
     label: 'USDC routed',
     isGradient: false,
     hasTrend: false,

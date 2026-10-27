@@ -95,7 +95,13 @@ export const FOOTER_LINKS: FooterLink[] = [
   { label: 'Github', href: 'https://github.com/alikali68/hopflow', external: true },
   { label: 'Twitter', href: 'https://x.com/alikali68', external: true },
 ];
-/* ══════════ DATA FOR DASHBOARD (PAGE 02) ══════════ */
+/* ══════════ SEED DATA FOR DASHBOARD ROUTES (PAGE 02) ══════════
+ * The routes slice (lib/routes.ts) seeds from these rows. The old
+ * DASHBOARD_STATS / UPCOMING / ACTIVITY constants were deleted in M4 step 3:
+ * headline stats are computed from the listed rows, upcoming executions
+ * from the routes' real next-execution times, and activity from the store
+ * log — the fake "Wallet connected" item and the phantom "NFT Minting" /
+ * "Community Rewards" routes are gone. */
 
 export interface DashboardStat {
   id: string;
@@ -105,6 +111,7 @@ export interface DashboardStat {
   iconType: 'nodes' | 'pulse' | 'dollar' | 'clock' | 'lock' | 'alert' | 'users';
 }
 
+/** Shape of one seed row (the store converts these to StoreRoute). */
 export interface DashboardRoute {
   id: string;
   name: string;
@@ -116,45 +123,10 @@ export interface DashboardRoute {
   nextHop: string;
 }
 
-export interface UpcomingExecution {
-  id: string;
-  time: string;
-  title: string;
-  amount: string;
-  dotColor: 'purple' | 'cyan' | 'green';
-}
-
-export interface ActivityItem {
-  id: string;
-  text: string;
-  time: string;
-  dotColor: 'green' | 'purple' | 'amber' | 'cyan';
-}
-
-export const DASHBOARD_STATS: DashboardStat[] = [
-  { id: 'total-routes', label: 'TOTAL ROUTES', value: '12', sub: '+2 this month', iconType: 'nodes' },
-  { id: 'active-routes', label: 'ACTIVE ROUTES', value: '5', sub: '3 executions this week', iconType: 'pulse' },
-  { id: 'total-volume', label: 'TOTAL VOLUME', value: '48,290 USDC', sub: '+12.4% vs last month', iconType: 'dollar' },
-  { id: 'next-execution', label: 'NEXT EXECUTION', value: '2h 14m', sub: 'Website Redesign · hop 4', iconType: 'clock' },
-];
-
 export const ROUTES: DashboardRoute[] = [
   { id: 'route-1', name: 'Website Redesign', type: 'Escrow', amount: '2,500 USDC', hopsExecuted: 3, totalHops: 5, status: 'Active', nextHop: 'Tomorrow, 09:00' },
   { id: 'route-2', name: 'Marketing Campaign', type: 'Payroll', amount: '1,800 USDC', hopsExecuted: 2, totalHops: 5, status: 'Pending', nextHop: 'Oct 25, 12:00' },
   { id: 'route-3', name: 'Content Creation', type: 'Vesting', amount: '950 USDC', hopsExecuted: 5, totalHops: 5, status: 'Completed', nextHop: '—' },
-];
-
-export const UPCOMING: UpcomingExecution[] = [
-  { id: 'up-1', time: 'In 2h 14m', title: 'Website Redesign — Escrow', amount: '1,200 USDC', dotColor: 'purple' },
-  { id: 'up-2', time: 'In 5h 30m', title: 'Team Payroll', amount: '3,400 USDC', dotColor: 'cyan' },
-  { id: 'up-3', time: 'Tomorrow • 09:00', title: 'Token Release', amount: '850 USDC', dotColor: 'green' },
-];
-
-export const ACTIVITY: ActivityItem[] = [
-  { id: 'act-1', text: 'Route "NFT Minting" completed', time: '12m ago', dotColor: 'green' },
-  { id: 'act-2', text: 'Wallet connected', time: '42m ago', dotColor: 'purple' },
-  { id: 'act-3', text: 'Pending approval added', time: '1h ago', dotColor: 'amber' },
-  { id: 'act-4', text: 'Route "Community Rewards" completed', time: '3h ago', dotColor: 'cyan' },
 ];
 
 /* ══════════ DATA FOR FREELANCE ESCROW (PAGE 03) ══════════ */
