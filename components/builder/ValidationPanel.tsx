@@ -10,15 +10,21 @@ import {
   formatSol,
   isValidSolanaAddress,
 } from './builderData';
+import { SOURCE_WALLET } from './previewData';
 import { CheckCircleIcon, AlertIcon } from '@/components/icons';
 
 export type ValidationIssue = { level: 'error' | 'warning'; message: string };
 
 /** Pure hop + schedule checks. Balance is checked separately (needs the live wallet). */
-export function validateHops(hops: HopDraft[], executions?: (Date | null)[]): ValidationIssue[] {
+export function validateHops(
+  hops: HopDraft[],
+  executions?: (Date | null)[],
+  sourceWallet?: string
+): ValidationIssue[] {
   const issues: ValidationIssue[] = [];
-  if (hops.length < 2) {
-    issues.push({ level: 'error', message: `At least 2 hops are required (protocol minimum) — you have ${hops.length}.` });
+  // Protocol minimum: 2 intermediate hops + the final recipient = 3 total.
+  if (hops.length < 3) {
+    issues.push({ level: 'error', message: `At least 3 hops are required — 2 intermediate hops plus the final recipient (protocol minimum).` });
   }
   if (hops.length > 9) {
     issues.push({ level: 'error', message: 'At most 9 hops per route.' });
@@ -32,7 +38,28 @@ export function validateHops(hops: HopDraft[], executions?: (Date | null)[]): Va
     if (!(h.amount > 0)) {
       issues.push({ level: 'error', message: `Hop ${i + 1}: amount must be greater than 0.` });
     }
+    if (sourceWallet && h.wallet.trim() === sourceWallet) {
+      issues.push({ level: 'error', message: `Hop ${i + 1} is the source wallet — the sender can't be a hop in its own route.` });
+    }
   });
+  // One route = one transfer: the same amount flows through every hop, so
+  // all hops must share the amount and the token. Only SOL is wired to the
+  // publish engine.
+  const first = hops[0];
+  if (first) {
+    hops.forEach((h, i) => {
+      if (i === 0) return;
+      if (h.amount !== first.amount || h.token !== first.token) {
+        issues.push({
+          level: 'error',
+          message: `All hops in one route must share the same amount and token — hop ${i + 1} is ${formatSol(h.amount)} ${h.token}, hop 1 is ${formatSol(first.amount)} ${first.token}.`,
+        });
+      }
+    });
+    if (first.token !== 'SOL') {
+      issues.push({ level: 'error', message: 'Only SOL routes can be published yet — switch all hops to SOL.' });
+    }
+  }
   const seen = new Map<string, number>();
   hops.forEach((h, i) => {
     const w = h.wallet.trim();
@@ -89,7 +116,11 @@ export default function ValidationPanel({ hops, executions }: ValidationPanelPro
   const fee = estimatedFeeSol(sol);
   const requiredSol = sol + fee;
 
-  const issues = validateHops(hops, executions);
+  const issues = validateHops(
+    hops,
+    executions,
+    publicKey?.toBase58() ?? SOURCE_WALLET
+  );
   if (connected && balanceSol !== null && sol > 0 && balanceSol < requiredSol) {
     issues.push({
       level: 'error',
