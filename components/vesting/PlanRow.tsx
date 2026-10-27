@@ -54,7 +54,14 @@ export default function PlanRow({ plan }: PlanRowProps) {
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-baseline gap-2">
           <h4 className="font-display text-[16px] font-bold text-white">
-            {plan.name}
+            {/* C6: only Core Team Vesting has a detail page yet */}
+            {plan.id === 'vp-1' ? (
+              <a href="/vesting/vp-1" className="transition-colors hover:text-[#B8B8FF] hover:underline">
+                {plan.name}
+              </a>
+            ) : (
+              plan.name
+            )}
           </h4>
           <span className="text-[12px] text-[#9A9AB0]">
             {plan.token} token · {plan.totalAmount} total · {plan.beneficiaries} beneficiaries
