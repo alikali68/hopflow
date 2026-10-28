@@ -11,6 +11,7 @@ import {
   HourglassIcon,
   NodesIcon,
   PulseIcon,
+  ClockIcon,
   SettingsIcon,
   WalletIcon,
 } from '../icons';
@@ -22,6 +23,7 @@ const NAV = [
   { label: 'Token Vesting', href: '/vesting', icon: <HourglassIcon size={18} /> },
   { label: 'Route Builder', href: '/builder', icon: <NodesIcon size={18} variant="current" /> },
   { label: 'Route Tracking', href: '/routes', icon: <PulseIcon size={18} /> },
+  { label: 'Transfer History', href: '/history', icon: <ClockIcon size={18} /> },
   { label: 'Settings', href: '/settings', icon: <SettingsIcon size={18} /> },
 ];
 

@@ -62,6 +62,8 @@ export interface PayoutRecord {
   amount: number;
   members: number;
   status: 'Completed';
+  /** Real on-chain signature, or null/undefined for a sample payout (no link). */
+  txSig?: string | null;
 }
 
 export interface PayrollTeam {
@@ -86,6 +88,8 @@ export interface PayrollTeam {
   vaultWalletShort: string | null;
   members: PayrollMember[];
   history: PayoutRecord[];
+  /** Published payout cycles (one transfer per cycle). A cycle is complete only when its transfer is completed — never at publish time. */
+  publishedCycles?: { cycleLabel: string; transferId: string; publishedAt: string }[];
 }
 
 /** The in-progress create-wizard draft. Lives in the store so every
@@ -267,9 +271,9 @@ function pt3Members(): PayrollMember[] {
 
 function historyFor(monthly: number, members: number): PayoutRecord[] {
   return [
-    { month: 'October 2026', date: at10('2026-10-01'), amount: monthly, members, status: 'Completed' },
-    { month: 'September 2026', date: at10('2026-09-01'), amount: monthly, members, status: 'Completed' },
-    { month: 'August 2026', date: at10('2026-08-01'), amount: monthly, members, status: 'Completed' },
+    { month: 'October 2026', date: at10('2026-10-01'), amount: monthly, members, status: 'Completed', txSig: null },
+    { month: 'September 2026', date: at10('2026-09-01'), amount: monthly, members, status: 'Completed', txSig: null },
+    { month: 'August 2026', date: at10('2026-08-01'), amount: monthly, members, status: 'Completed', txSig: null },
   ];
 }
 

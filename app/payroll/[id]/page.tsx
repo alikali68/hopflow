@@ -3,6 +3,7 @@
 import React from 'react';
 import AppShell from '@/components/app/AppShell';
 import NextPayoutCountdown from '@/components/payroll/NextPayoutCountdown';
+import PublishPayrollPanel from '@/components/payroll/PublishPayrollPanel';
 import TeamMembersCard from '@/components/payroll/TeamMembersCard';
 import PayoutHistoryCard from '@/components/payroll/PayoutHistoryCard';
 import ScheduleControlCard from '@/components/payroll/ScheduleControlCard';
@@ -93,6 +94,7 @@ export default function TeamDashboardPage({ params }: { params: Promise<{ id: st
         {/* Main Column */}
         <div className="flex flex-col gap-6">
           <NextPayoutCountdown team={team} />
+          <PublishPayrollPanel team={team} />
           <TeamMembersCard team={team} />
           <PayoutHistoryCard team={team} />
         </div>

@@ -100,6 +100,8 @@ export interface VestingPlan {
   createdAt: string;
   beneficiaries: VestingBeneficiary[];
   history: ReleaseRecord[];
+  /** Published release events (one transfer per event). A release is paid only when its transfer is completed — never at publish time. */
+  publishedReleases?: { releaseDate: string; label: string; transferId: string; publishedAt: string }[];
 }
 
 /** The in-progress create-wizard draft. Lives in the store so every

@@ -257,10 +257,12 @@ export type StoreAction =
   | { type: 'payroll/removeMember'; teamId: string; memberId: string }
   | { type: 'payroll/undoRemoveMember'; teamId: string; memberId: string }
   | { type: 'payroll/setTeamStatus'; teamId: string; status: 'Active' | 'Paused' }
+  | { type: 'payroll/markCyclePublished'; teamId: string; cycleLabel: string; transferId: string }
   | { type: 'vesting/setDraft'; draft: VestingDraft }
   | { type: 'vesting/saveDraft' }
   | { type: 'vesting/createPlan' }
   | { type: 'vesting/setPlanStatus'; planId: string; paused: boolean }
+  | { type: 'vesting/markReleasePublished'; planId: string; releaseDate: string; label: string; transferId: string }
   /** Timezone preference change (Settings). `resolved` is computed by
    * the caller (handler/effect) and the module zone is set BEFORE
    * dispatching, so the re-render already formats in the new zone. */
@@ -836,6 +838,28 @@ function reducer(state: AppState, action: StoreAction): AppState {
         ),
       };
     }
+    case 'payroll/markCyclePublished': {
+      const team = state.payroll.teams.find((t) => t.id === action.teamId);
+      if (!team) return state;
+      if (team.publishedCycles?.some((c) => c.cycleLabel === action.cycleLabel)) return state; // no double-publish
+      const nowIso = new Date().toISOString();
+      const nextTeams = state.payroll.teams.map((t) =>
+        t.id === action.teamId
+          ? {
+              ...t,
+              publishedCycles: [
+                ...(t.publishedCycles ?? []),
+                { cycleLabel: action.cycleLabel, transferId: action.transferId, publishedAt: nowIso },
+              ],
+            }
+          : t,
+      );
+      return {
+        ...state,
+        payroll: { ...state.payroll, teams: nextTeams },
+        activity: appendActivity(state.activity, `Payout published on-chain · ${team.name} (${action.cycleLabel})`, 'green'),
+      };
+    }
     case 'vesting/setDraft': {
       const d = state.vesting.draft;
       return {
@@ -891,6 +915,28 @@ function reducer(state: AppState, action: StoreAction): AppState {
             : `Vesting plan '${plan.name}' resumed`,
           action.paused ? 'amber' : 'green',
         ),
+      };
+    }
+    case 'vesting/markReleasePublished': {
+      const plan = state.vesting.plans.find((p) => p.id === action.planId);
+      if (!plan) return state;
+      if (plan.publishedReleases?.some((r) => r.releaseDate === action.releaseDate)) return state; // no double-publish
+      const nowIso = new Date().toISOString();
+      const nextPlans = state.vesting.plans.map((p) =>
+        p.id === action.planId
+          ? {
+              ...p,
+              publishedReleases: [
+                ...(p.publishedReleases ?? []),
+                { releaseDate: action.releaseDate, label: action.label, transferId: action.transferId, publishedAt: nowIso },
+              ],
+            }
+          : p,
+      );
+      return {
+        ...state,
+        vesting: { ...state.vesting, plans: nextPlans },
+        activity: appendActivity(state.activity, `Release published on-chain · ${plan.name} (${action.label})`, 'green'),
       };
     }
     case 'session/setDemoMode': {

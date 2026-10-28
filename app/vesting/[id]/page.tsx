@@ -4,6 +4,7 @@ import React from 'react';
 import AppShell from '@/components/app/AppShell';
 import PlanProgressCard from '@/components/vesting/PlanProgressCard';
 import PlanBeneficiariesCard from '@/components/vesting/PlanBeneficiariesCard';
+import PublishVestingPanel from '@/components/vesting/PublishVestingPanel';
 import ReleaseHistoryCard from '@/components/vesting/ReleaseHistoryCard';
 import VestingScheduleCard from '@/components/vesting/VestingScheduleCard';
 import PlanVaultCard from '@/components/vesting/PlanVaultCard';
@@ -103,6 +104,7 @@ export default function PlanDetailPage({ params }: { params: Promise<{ id: strin
         <div className="flex flex-col gap-6">
           <PlanProgressCard plan={plan} />
           <PlanBeneficiariesCard plan={plan} />
+          <PublishVestingPanel plan={plan} />
           <ReleaseHistoryCard plan={plan} />
         </div>
 
