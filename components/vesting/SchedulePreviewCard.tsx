@@ -1,21 +1,22 @@
 import React from 'react';
 import { CalendarIcon } from '../icons';
-import { formatLongDate } from '@/lib/dates';
+import { formatLongDateTz } from '@/lib/dates';
 import {
-  DEFAULT_START_DATE,
-  DEFAULT_CLIFF,
-  DEFAULT_DURATION_MONTHS,
-  DEFAULT_FREQUENCY,
-  DEFAULT_TGE,
+  type VestingDraft,
   cliffLabel,
   durationLabel,
   frequencyLabel,
   firstReleaseDate,
-  tgeAmount,
-} from './scheduleData';
-import { PLAN_TOKEN, formatFlow } from './beneficiariesData';
+  tgeAmountOf,
+} from '@/lib/vesting';
+import { parseShortDate } from '@/lib/dates';
+import { formatFlow } from './beneficiariesData';
 
-export default function SchedulePreviewCard() {
+export default function SchedulePreviewCard({ draft }: { draft: VestingDraft }) {
+  const start = parseShortDate(draft.startDate) ?? new Date(2026, 10, 1);
+  const total = parseFloat(draft.totalAmount.replace(/,/g, '')) || 0;
+  const firstRelease = firstReleaseDate(start, draft.cliffMonths);
+
   return (
     <div className="glass-panel rounded-2xl p-5">
       {/* Header */}
@@ -33,42 +34,42 @@ export default function SchedulePreviewCard() {
         <div className="flex items-start justify-between gap-4 border-b border-white/[0.06] py-2.5 first:pt-0">
           <span className="text-[13.5px] text-[#9A9AB0]">Start</span>
           <span className="font-display text-right text-[14px] font-bold text-white">
-            {formatLongDate(DEFAULT_START_DATE)}
+            {formatLongDateTz(start)}
           </span>
         </div>
 
         <div className="flex items-start justify-between gap-4 border-b border-white/[0.06] py-2.5">
           <span className="text-[13.5px] text-[#9A9AB0]">Cliff</span>
           <span className="font-display text-right text-[14px] font-bold text-white">
-            {cliffLabel(DEFAULT_CLIFF)}
+            {cliffLabel(draft.cliffMonths)}
           </span>
         </div>
 
         <div className="flex items-start justify-between gap-4 border-b border-white/[0.06] py-2.5">
           <span className="text-[13.5px] text-[#9A9AB0]">First release</span>
           <span className="font-display text-right text-[14px] font-bold text-white">
-            {formatLongDate(firstReleaseDate(DEFAULT_START_DATE, DEFAULT_CLIFF))}
+            {formatLongDateTz(firstRelease)}
           </span>
         </div>
 
         <div className="flex items-start justify-between gap-4 border-b border-white/[0.06] py-2.5">
           <span className="text-[13.5px] text-[#9A9AB0]">Duration</span>
           <span className="font-display text-right text-[14px] font-bold text-white">
-            {durationLabel(DEFAULT_DURATION_MONTHS)}
+            {durationLabel(draft.durationMonths)}
           </span>
         </div>
 
         <div className="flex items-start justify-between gap-4 border-b border-white/[0.06] py-2.5">
           <span className="text-[13.5px] text-[#9A9AB0]">Frequency</span>
           <span className="font-display text-right text-[14px] font-bold text-white">
-            {frequencyLabel(DEFAULT_FREQUENCY)}
+            {frequencyLabel(draft.frequency)}
           </span>
         </div>
 
         <div className="flex items-start justify-between gap-4 py-2.5 pb-0">
           <span className="text-[13.5px] text-[#9A9AB0]">TGE unlock</span>
           <span className="font-display text-right text-[14px] font-bold text-white">
-            {DEFAULT_TGE}% ({formatFlow(tgeAmount(DEFAULT_TGE))} {PLAN_TOKEN})
+            {draft.tgePercent}% ({formatFlow(tgeAmountOf(total, draft.tgePercent))} {draft.token})
           </span>
         </div>
       </div>

@@ -1,20 +1,13 @@
 'use client';
 
-import React, { useState } from 'react';
-import {
-  DEFAULT_START_DATE,
-  DEFAULT_CLIFF,
-  DEFAULT_DURATION_MONTHS,
-  DEFAULT_FREQUENCY,
-  DEFAULT_TGE,
-  cliffLabel,
-  durationLabel,
-  frequencyLabel,
-} from './scheduleData';
-import { formatLongDate } from '@/lib/dates';
+import React from 'react';
+import { type VestingPlan, cliffLabel, durationLabel, frequencyLabel } from '@/lib/vesting';
+import { formatLongDateTz } from '@/lib/dates';
+import { useStore } from '@/lib/store';
 
-export default function VestingScheduleCard() {
-  const [paused, setPaused] = useState(false);
+export default function VestingScheduleCard({ plan }: { plan: VestingPlan }) {
+  const { dispatch } = useStore();
+  const paused = plan.paused;
 
   return (
     <div className="glass-panel rounded-2xl p-5">
@@ -37,42 +30,42 @@ export default function VestingScheduleCard() {
         <div className="flex items-center justify-between border-b border-white/[0.06] py-2.5">
           <span className="text-[13.5px] text-[#9A9AB0]">Start</span>
           <span className="font-display text-[14px] font-bold text-white">
-            {formatLongDate(DEFAULT_START_DATE)}
+            {formatLongDateTz(new Date(plan.startAt))}
           </span>
         </div>
 
         <div className="flex items-center justify-between border-b border-white/[0.06] py-2.5">
           <span className="text-[13.5px] text-[#9A9AB0]">Cliff</span>
           <span className="font-display text-[14px] font-bold text-white">
-            {cliffLabel(DEFAULT_CLIFF)}
+            {cliffLabel(plan.cliffMonths)}
           </span>
         </div>
 
         <div className="flex items-center justify-between border-b border-white/[0.06] py-2.5">
           <span className="text-[13.5px] text-[#9A9AB0]">Duration</span>
           <span className="font-display text-[14px] font-bold text-white">
-            {durationLabel(DEFAULT_DURATION_MONTHS)}
+            {durationLabel(plan.durationMonths)}
           </span>
         </div>
 
         <div className="flex items-center justify-between border-b border-white/[0.06] py-2.5">
           <span className="text-[13.5px] text-[#9A9AB0]">Frequency</span>
           <span className="font-display text-[14px] font-bold text-white">
-            {frequencyLabel(DEFAULT_FREQUENCY)}
+            {frequencyLabel(plan.frequency)}
           </span>
         </div>
 
         <div className="flex items-center justify-between py-2.5 pb-0">
           <span className="text-[13.5px] text-[#9A9AB0]">TGE unlock</span>
           <span className="font-display text-[14px] font-bold text-white">
-            {DEFAULT_TGE}%
+            {plan.tgePercent}%
           </span>
         </div>
       </div>
 
       <button
         type="button"
-        onClick={() => setPaused((p) => !p)}
+        onClick={() => dispatch({ type: 'vesting/setPlanStatus', planId: plan.id, paused: !paused })}
         className={`mt-4 flex h-[48px] w-full items-center justify-center rounded-xl text-[14px] font-bold transition-all ${
           paused
             ? 'border border-[#14F195]/40 bg-[#14F195]/10 text-[#14F195] hover:bg-[#14F195]/20'
@@ -84,7 +77,7 @@ export default function VestingScheduleCard() {
 
       <p className="mt-3 text-center text-[12px] leading-relaxed text-[#9A9AB0]">
         {paused
-          ? 'Releases are on hold. Resume anytime — the next release moves to the following month.'
+          ? 'Releases are on hold. Resume anytime — the next release is re-derived from the schedule.'
           : 'Pausing stops future releases. Tokens already released stay with the beneficiaries.'}
       </p>
     </div>

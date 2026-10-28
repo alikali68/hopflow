@@ -1,8 +1,9 @@
 import React from 'react';
 import { WalletIcon } from '../icons';
-import { VESTING_SUMMARY } from './vestingData';
+import type { VestingStats } from '@/lib/vesting';
+import { fmt0 } from '@/lib/vesting';
 
-export default function VestingSummaryCard() {
+export default function VestingSummaryCard({ stats }: { stats: VestingStats }) {
   return (
     <div className="glass-panel rounded-2xl p-5">
       <div className="flex items-center gap-2.5">
@@ -16,7 +17,7 @@ export default function VestingSummaryCard() {
         <div className="flex items-center justify-between py-2.5 text-[13px]">
           <span className="text-[#9A9AB0]">Total locked</span>
           <span className="font-display font-bold text-white">
-            {VESTING_SUMMARY.locked}
+            {fmt0(stats.totalLocked)} FLOW
           </span>
         </div>
 
@@ -25,7 +26,7 @@ export default function VestingSummaryCard() {
         <div className="flex items-center justify-between py-2.5 text-[13px]">
           <span className="text-[#9A9AB0]">Beneficiaries</span>
           <span className="font-display font-bold text-white">
-            {VESTING_SUMMARY.beneficiaries}
+            {stats.totalBeneficiaries}
           </span>
         </div>
 
@@ -34,7 +35,7 @@ export default function VestingSummaryCard() {
         <div className="flex items-center justify-between py-2.5 text-[13px]">
           <span className="text-[#9A9AB0]">Plans</span>
           <span className="font-display font-bold text-white">
-            {VESTING_SUMMARY.plans}
+            {stats.totalPlans}
           </span>
         </div>
       </div>

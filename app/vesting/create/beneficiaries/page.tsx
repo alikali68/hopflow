@@ -1,3 +1,5 @@
+'use client';
+
 import React from 'react';
 import AppShell from '@/components/app/AppShell';
 import WizardSteps from '@/components/app/WizardSteps';
@@ -6,15 +8,13 @@ import AllocationPreviewCard from '@/components/vesting/AllocationPreviewCard';
 import PlanTotalCard from '@/components/vesting/PlanTotalCard';
 import { ArrowLeftIcon } from '@/components/icons';
 import { VESTING_WIZARD_STEPS } from '@/components/vesting/createPlanData';
-import {
-  PLAN_NAME,
-  PLAN_TOKEN,
-  PLAN_TOTAL,
-  SEED_BENEFICIARIES,
-  formatFlow,
-} from '@/components/vesting/beneficiariesData';
+import { useVesting } from '@/lib/store';
+import { formatFlow } from '@/components/vesting/beneficiariesData';
 
 export default function AddBeneficiariesPage() {
+  const { draft } = useVesting();
+  const total = parseFloat(draft.totalAmount.replace(/,/g, '')) || 0;
+
   return (
     <AppShell active="Token Vesting">
       {/* Navigation & Header */}
@@ -39,16 +39,16 @@ export default function AddBeneficiariesPage() {
 
       {/* Summary Strip */}
       <div className="grad-border-soft rounded-full px-6 py-3 text-center text-[14px] text-[#D8D8E2]">
-        {PLAN_NAME} · {PLAN_TOKEN} · {SEED_BENEFICIARIES.length} beneficiaries · Total locked{' '}
-        <span className="font-bold text-white">{formatFlow(PLAN_TOTAL)} {PLAN_TOKEN}</span>
+        {draft.planName.trim() || 'Untitled plan'} · {draft.token} · {draft.beneficiaries.length} beneficiaries · Total locked{' '}
+        <span className="font-bold text-white">{formatFlow(total)} {draft.token}</span>
       </div>
 
       {/* Main Form + Right Rail Layout */}
       <div className="mt-6 grid grid-cols-1 items-start gap-6 xl:grid-cols-[1fr_340px]">
         <AddBeneficiariesForm />
         <aside className="flex flex-col gap-6" aria-label="Allocation preview and plan total">
-          <AllocationPreviewCard />
-          <PlanTotalCard />
+          <AllocationPreviewCard draft={draft} />
+          <PlanTotalCard draft={draft} />
         </aside>
       </div>
     </AppShell>

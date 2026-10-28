@@ -1,23 +1,25 @@
 'use client';
 
-import React, { useState } from 'react';
+import React from 'react';
 import {
   PlusIcon,
   ChevronRightIcon,
   ArrowLeftIcon,
   CheckCircleIcon,
 } from '../icons';
-import {
-  SEED_BENEFICIARIES,
-  MAX_BENEFICIARIES,
-  Beneficiary,
-  isValidSolanaAddress,
-} from './beneficiariesData';
+import { MAX_BENEFICIARIES, isValidSolanaAddress } from './beneficiariesData';
+import { useVesting } from '@/lib/store';
+import type { VestingDraftBeneficiary } from '@/lib/vesting';
 import BeneficiaryRow from './BeneficiaryRow';
 
 export default function AddBeneficiariesForm() {
-  const [beneficiaries, setBeneficiaries] = useState<Beneficiary[]>(SEED_BENEFICIARIES);
-  const [nextId, setNextId] = useState(5);
+  const { draft, dispatch } = useVesting();
+  const beneficiaries = draft.beneficiaries;
+  const total = parseFloat(draft.totalAmount.replace(/,/g, '')) || 0;
+
+  const setDraft = (patch: Partial<typeof draft>) => {
+    dispatch({ type: 'vesting/setDraft', draft: { ...draft, ...patch } });
+  };
 
   const totalShare = beneficiaries.reduce(
     (sum, b) => sum + (b.sharePercent || 0),
@@ -34,27 +36,26 @@ export default function AddBeneficiariesForm() {
     ) &&
     totalShare === 100;
 
-  const updateBeneficiary = (id: string, patch: Partial<Beneficiary>) => {
-    setBeneficiaries((prev) =>
-      prev.map((b) => (b.id === id ? { ...b, ...patch } : b))
-    );
+  const updateBeneficiary = (id: string, patch: Partial<VestingDraftBeneficiary>) => {
+    setDraft({
+      beneficiaries: beneficiaries.map((b) => (b.id === id ? { ...b, ...patch } : b)),
+    });
   };
 
   const removeBeneficiary = (id: string) => {
     if (beneficiaries.length <= 1) return;
-    setBeneficiaries((prev) => prev.filter((b) => b.id !== id));
+    setDraft({ beneficiaries: beneficiaries.filter((b) => b.id !== id) });
   };
 
   const addBeneficiary = () => {
     if (beneficiaries.length >= MAX_BENEFICIARIES) return;
-    const newBeneficiary: Beneficiary = {
-      id: `b${nextId}`,
+    const newBeneficiary: VestingDraftBeneficiary = {
+      id: `b-${Date.now().toString(36)}`,
       name: '',
       wallet: '',
       sharePercent: 0,
     };
-    setNextId((id) => id + 1);
-    setBeneficiaries((prev) => [...prev, newBeneficiary]);
+    setDraft({ beneficiaries: [...beneficiaries, newBeneficiary] });
   };
 
   const isAtMax = beneficiaries.length >= MAX_BENEFICIARIES;
@@ -70,6 +71,8 @@ export default function AddBeneficiariesForm() {
               key={beneficiary.id}
               beneficiary={beneficiary}
               index={index}
+              total={total}
+              token={draft.token}
               onChange={(patch) => updateBeneficiary(beneficiary.id, patch)}
               onRemove={() => removeBeneficiary(beneficiary.id)}
               canRemove={beneficiaries.length > 1}

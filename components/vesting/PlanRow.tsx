@@ -1,9 +1,9 @@
 import React from 'react';
-import type { VestingPlan } from './vestingData';
+import type { VestingRow } from '@/lib/vesting';
 import { LockIcon } from '../icons';
 
 interface PlanRowProps {
-  plan: VestingPlan;
+  plan: VestingRow;
 }
 
 export default function PlanRow({ plan }: PlanRowProps) {
@@ -33,16 +33,6 @@ export default function PlanRow({ plan }: PlanRowProps) {
     }
   };
 
-  const getReleaseCaption = () => {
-    if (plan.status === 'Active') {
-      return `Next release ${plan.nextRelease}`;
-    }
-    if (plan.status === 'Cliff') {
-      return `Cliff until ${plan.cliffUntil}`;
-    }
-    return 'Completed — fully released';
-  };
-
   return (
     <div className="grad-border-soft flex gap-4 rounded-xl p-4 transition-colors hover:bg-white/[0.03]">
       {/* Icon Tile */}
@@ -54,17 +44,12 @@ export default function PlanRow({ plan }: PlanRowProps) {
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-baseline gap-2">
           <h4 className="font-display text-[16px] font-bold text-white">
-            {/* C6: only Core Team Vesting has a detail page yet */}
-            {plan.id === 'vp-1' ? (
-              <a href="/vesting/vp-1" className="transition-colors hover:text-[#B8B8FF] hover:underline">
-                {plan.name}
-              </a>
-            ) : (
-              plan.name
-            )}
+            <a href={`/vesting/${plan.id}`} className="transition-colors hover:text-[#B8B8FF] hover:underline">
+              {plan.name}
+            </a>
           </h4>
           <span className="text-[12px] text-[#9A9AB0]">
-            {plan.token} token · {plan.totalAmount} total · {plan.beneficiaries} beneficiaries
+            {plan.token} token · {plan.totalLabel} total · {plan.beneficiaryCount} beneficiaries
           </span>
         </div>
 
@@ -89,10 +74,10 @@ export default function PlanRow({ plan }: PlanRowProps) {
         {/* Bottom Details Row */}
         <div className="mt-2.5 flex flex-wrap items-center justify-between gap-x-4 gap-y-1 text-[12px] text-[#9A9AB0]">
           <span className="whitespace-nowrap">
-            Released {plan.releasedAmount} · Locked {plan.lockedAmount}
+            Released {plan.releasedAmount.toLocaleString('en-US')} {plan.token} · Locked {plan.lockedAmount.toLocaleString('en-US')} {plan.token}
           </span>
           <span className="whitespace-nowrap text-[#B8B8C7]">
-            {getReleaseCaption()}
+            {plan.nextReleaseCaption}
           </span>
         </div>
       </div>
@@ -100,9 +85,16 @@ export default function PlanRow({ plan }: PlanRowProps) {
       {/* Right Column: Total Amount + Status */}
       <div className="flex shrink-0 flex-col items-end justify-between">
         <span className="font-display whitespace-nowrap text-[17px] font-bold text-white">
-          {plan.totalAmount}
+          {plan.totalLabel}
         </span>
-        <div className="mt-2">{getStatusChip()}</div>
+        <div className="mt-2 flex items-center gap-1.5">
+          {plan.paused && (
+            <span className="inline-flex items-center gap-1.5 rounded-full border border-[#F5C542]/25 bg-[#F5C542]/12 px-2.5 py-[3px] text-[11px] font-semibold text-[#F5C542]">
+              Paused
+            </span>
+          )}
+          {getStatusChip()}
+        </div>
       </div>
     </div>
   );

@@ -63,6 +63,14 @@ import {
   type PayrollTeam,
   type PayrollDraft,
 } from './payroll';
+import {
+  seedVestingPlans,
+  seedVestingDraft,
+  buildPlanFromDraft,
+  resumeNextRelease,
+  type VestingPlan,
+  type VestingDraft,
+} from './vesting';
 import { isValidSolanaAddress as isValidPayrollAddress } from '@/components/payroll/addMembersData';
 import { parseShortDate, setEffectiveTimeZone } from './dates';
 import { combineDateTime } from './route-time';
@@ -106,6 +114,18 @@ export interface PayrollState {
   lastCreatedTeamId: string | null;
 }
 
+export interface VestingState {
+  plans: VestingPlan[];
+  /** The in-progress create-wizard draft (all four steps share it). */
+  draft: VestingDraft;
+  /** Id of the plan most recently created from the wizard (null when
+   * none). The createPlan action resets the draft to seed, so the
+   * preview page's done view renders from this plan — never from the
+   * reset draft (which would show seed values). Cleared on the first
+   * edit or save of a new draft (setDraft/saveDraft). */
+  lastCreatedPlanId: string | null;
+}
+
 export interface TimezoneSettings {
   /** 'auto' = the browser-detected zone; 'manual' = the chosen zone. */
   mode: 'auto' | 'manual';
@@ -147,10 +167,13 @@ export interface AppState {
    * here (in-app only — there is no on-chain payroll route in this
    * beta). */
   payroll: PayrollState;
+  /** Token vesting — the single source of truth for the list, detail
+   * and create pages. Pauses and creations are recorded here (in-app
+   * only — there is no on-chain vesting lock in this beta). */
+  vesting: VestingState;
   /** User settings — timezone for now (vesting slice lands in a later
    * M4 step). */
   settings: AppSettings;
-  // Later M4 steps add: vesting.
 }
 
 export type StoreAction =
@@ -177,6 +200,10 @@ export type StoreAction =
   | { type: 'payroll/removeMember'; teamId: string; memberId: string }
   | { type: 'payroll/undoRemoveMember'; teamId: string; memberId: string }
   | { type: 'payroll/setTeamStatus'; teamId: string; status: 'Active' | 'Paused' }
+  | { type: 'vesting/setDraft'; draft: VestingDraft }
+  | { type: 'vesting/saveDraft' }
+  | { type: 'vesting/createPlan' }
+  | { type: 'vesting/setPlanStatus'; planId: string; paused: boolean }
   /** Timezone preference change (Settings). `resolved` is computed by
    * the caller (handler/effect) and the module zone is set BEFORE
    * dispatching, so the re-render already formats in the new zone. */
@@ -212,6 +239,14 @@ function seedPayrollState(): PayrollState {
   };
 }
 
+function seedVestingState(): VestingState {
+  return {
+    plans: seedVestingPlans(),
+    draft: seedVestingDraft(),
+    lastCreatedPlanId: null,
+  };
+}
+
 function seedSettings(): AppSettings {
   return { timezone: { mode: 'auto', zone: null, resolved: DEFAULT_TIME_ZONE } };
 }
@@ -225,6 +260,7 @@ function seedAppState(): AppState {
     activity: seedActivity(),
     freelance: seedFreelanceState(),
     payroll: seedPayrollState(),
+    vesting: seedVestingState(),
     settings: seedSettings(),
   };
 }
@@ -358,9 +394,9 @@ function reducer(state: AppState, action: StoreAction): AppState {
     }
     case 'builder/resetToSeed': {
       // "Reset demo data": builder draft back to seed + exit demo mode.
-      // The routes list, activity log, freelance projects and payroll
-      // teams are sample data too — they reset to seed as well so the
-      // whole app is coherent again.
+      // The routes list, activity log, freelance projects, payroll
+      // teams and vesting plans are sample data too — they reset to seed
+      // as well so the whole app is coherent again.
       return {
         ...state,
         builder: seedBuilderState(),
@@ -369,6 +405,7 @@ function reducer(state: AppState, action: StoreAction): AppState {
         activity: seedActivity(),
         freelance: seedFreelanceState(),
         payroll: seedPayrollState(),
+        vesting: seedVestingState(),
       };
     }
     case 'routes/setStatus': {
@@ -685,6 +722,63 @@ function reducer(state: AppState, action: StoreAction): AppState {
         ),
       };
     }
+    case 'vesting/setDraft': {
+      const d = state.vesting.draft;
+      return {
+        ...state,
+        vesting: {
+          ...state.vesting,
+          draft: { ...action.draft, draftVersion: d.draftVersion + 1 },
+          // A new draft edit means the user is working on a new plan —
+          // the done view of the previously created plan must not linger.
+          lastCreatedPlanId: null,
+        },
+      };
+    }
+    case 'vesting/saveDraft': {
+      const d = state.vesting.draft;
+      return {
+        ...state,
+        vesting: {
+          ...state.vesting,
+          draft: { ...d, draftSavedAt: new Date().toISOString(), draftSavedVersion: d.draftVersion },
+          lastCreatedPlanId: null,
+        },
+      };
+    }
+    case 'vesting/createPlan': {
+      const plan = buildPlanFromDraft(state.vesting.draft);
+      return {
+        ...state,
+        vesting: { plans: [plan, ...state.vesting.plans], draft: seedVestingDraft(), lastCreatedPlanId: plan.id },
+        activity: appendActivity(state.activity, `Vesting plan '${plan.name}' created`, 'purple'),
+      };
+    }
+    case 'vesting/setPlanStatus': {
+      const plan = state.vesting.plans.find((p) => p.id === action.planId);
+      if (!plan || plan.paused === action.paused) return state;
+      const now = new Date();
+      const nextPlans = state.vesting.plans.map((p) => {
+        if (p.id !== action.planId) return p;
+        // Resuming re-derives the next release from the schedule at now
+        // (the stored date may have slipped past while paused).
+        const next = !action.paused
+          ? resumeNextRelease(p, now)
+          : { at: p.nextReleaseAt, amount: p.nextReleaseAmount };
+        return { ...p, paused: action.paused, nextReleaseAt: next.at, nextReleaseAmount: next.amount };
+      });
+      return {
+        ...state,
+        vesting: { ...state.vesting, plans: nextPlans },
+        activity: appendActivity(
+          state.activity,
+          action.paused
+            ? `Vesting plan '${plan.name}' paused`
+            : `Vesting plan '${plan.name}' resumed`,
+          action.paused ? 'amber' : 'green',
+        ),
+      };
+    }
     case 'session/setDemoMode': {
       if (state.demoMode === action.demoMode) return state;
       return { ...state, demoMode: action.demoMode };
@@ -896,6 +990,55 @@ function isValidStoredState(value: unknown): value is AppState {
       return false;
     }
   }
+  // vesting is optional (states saved before step 6 lack it) — but when
+  // present it must be well-shaped.
+  if (v.vesting !== undefined) {
+    const vs = v.vesting as Record<string, unknown>;
+    if (!vs || typeof vs !== 'object' || !Array.isArray(vs.plans) || !vs.draft || typeof vs.draft !== 'object') return false;
+    const plansOk = (vs.plans as unknown[]).every((p) => {
+      if (!p || typeof p !== 'object') return false;
+      const o = p as Record<string, unknown>;
+      return (
+        typeof o.id === 'string' &&
+        typeof o.name === 'string' &&
+        typeof o.token === 'string' &&
+        typeof o.mint === 'string' &&
+        (o.status === 'Active' || o.status === 'Cliff' || o.status === 'Completed') &&
+        typeof o.paused === 'boolean' &&
+        typeof o.startAt === 'string' &&
+        typeof o.cliffMonths === 'number' &&
+        typeof o.durationMonths === 'number' &&
+        (o.frequency === 'monthly' || o.frequency === 'weekly') &&
+        typeof o.tgePercent === 'number' &&
+        typeof o.totalAmount === 'number' &&
+        typeof o.releasedAmount === 'number' &&
+        (o.nextReleaseAt === null || typeof o.nextReleaseAt === 'string') &&
+        typeof o.nextReleaseAmount === 'number' &&
+        typeof o.createdAt === 'string' &&
+        Array.isArray(o.beneficiaries) &&
+        Array.isArray(o.history)
+      );
+    });
+    if (!plansOk) return false;
+    const d = vs.draft as Record<string, unknown>;
+    if (
+      typeof d.planName !== 'string' ||
+      typeof d.mint !== 'string' ||
+      typeof d.token !== 'string' ||
+      typeof d.totalAmount !== 'string' ||
+      !Array.isArray(d.beneficiaries) ||
+      typeof d.startDate !== 'string' ||
+      typeof d.cliffMonths !== 'number' ||
+      typeof d.durationMonths !== 'number' ||
+      (d.frequency !== 'monthly' && d.frequency !== 'weekly') ||
+      typeof d.tgePercent !== 'number' ||
+      typeof d.draftVersion !== 'number' ||
+      typeof d.draftSavedVersion !== 'number' ||
+      (d.draftSavedAt !== null && typeof d.draftSavedAt !== 'string')
+    ) {
+      return false;
+    }
+  }
   // settings is optional (states saved before the timezone fix lack it)
   // — but when present it must be well-shaped.
   if (v.settings !== undefined) {
@@ -966,6 +1109,24 @@ function reviveStoredState(parsed: AppState): AppState {
               : null,
         }
       : seedPayrollState(),
+    // Pre-step-6 states have no vesting slice — seed it.
+    vesting: parsed.vesting
+      ? {
+          plans: parsed.vesting.plans.map((p) => ({
+            ...p,
+            beneficiaries: p.beneficiaries.map((b) => ({ ...b })),
+            history: p.history.map((h) => ({ ...h })),
+          })),
+          draft: {
+            ...parsed.vesting.draft,
+            beneficiaries: parsed.vesting.draft.beneficiaries.map((b) => ({ ...b })),
+          },
+          lastCreatedPlanId:
+            typeof parsed.vesting.lastCreatedPlanId === 'string'
+              ? parsed.vesting.lastCreatedPlanId
+              : null,
+        }
+      : seedVestingState(),
     // Pre-timezone-fix states have no settings — seed them (auto mode,
     // resolved after mount by the resolve effect).
     settings: parsed.settings
@@ -1096,6 +1257,17 @@ export function usePayroll(): {
 } {
   const { state, dispatch } = useStore();
   return { teams: state.payroll.teams, draft: state.payroll.draft, lastCreatedTeamId: state.payroll.lastCreatedTeamId, dispatch };
+}
+
+/** The vesting slice (plan list, detail, create draft). */
+export function useVesting(): {
+  plans: VestingPlan[];
+  draft: VestingDraft;
+  lastCreatedPlanId: string | null;
+  dispatch: React.Dispatch<StoreAction>;
+} {
+  const { state, dispatch } = useStore();
+  return { plans: state.vesting.plans, draft: state.vesting.draft, lastCreatedPlanId: state.vesting.lastCreatedPlanId, dispatch };
 }
 
 /** The routes slice (dashboard list, routes list page, tracking sample

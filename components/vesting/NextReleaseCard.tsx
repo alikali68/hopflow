@@ -1,8 +1,11 @@
 import React from 'react';
 import { CalendarIcon } from '../icons';
-import { NEXT_RELEASE } from './vestingData';
+import type { VestingStats } from '@/lib/vesting';
+import { formatShortDate } from '@/lib/dates';
 
-export default function NextReleaseCard() {
+export default function NextReleaseCard({ stats }: { stats: VestingStats }) {
+  const hasNext = stats.nextReleaseAt !== null && stats.nextReleasePlanId !== null;
+
   return (
     <div className="glass-panel rounded-2xl p-5">
       <div className="flex items-center gap-2.5">
@@ -14,20 +17,28 @@ export default function NextReleaseCard() {
         </h3>
       </div>
 
-      <p className="font-display mt-3 text-[30px] font-bold leading-none tracking-tight text-white">
-        {NEXT_RELEASE.dateLabel}
-      </p>
+      {hasNext ? (
+        <>
+          <p className="font-display mt-3 text-[30px] font-bold leading-none tracking-tight text-white">
+            {formatShortDate(new Date(stats.nextReleaseAt as string))}
+          </p>
 
-      <p className="mt-2 text-[12.5px] text-[#9A9AB0]">
-        {NEXT_RELEASE.planName} · {NEXT_RELEASE.beneficiaries} beneficiaries
-      </p>
+          <p className="mt-2 text-[12.5px] text-[#9A9AB0]">
+            {stats.nextReleasePlanName} · {stats.nextReleaseBeneficiaries} beneficiaries
+          </p>
 
-      <button
-        type="button"
-        className="mt-4 flex h-[46px] w-full items-center justify-center rounded-xl bg-gradient-to-r from-[#9945FF] to-[#14F195] px-6 text-[14.5px] font-bold text-white shadow-[0_0_24px_rgba(153,69,255,0.4)] transition hover:brightness-110 active:scale-[0.99]"
-      >
-        View plan
-      </button>
+          <a
+            href={`/vesting/${stats.nextReleasePlanId}`}
+            className="mt-4 flex h-[46px] w-full items-center justify-center rounded-xl bg-gradient-to-r from-[#9945FF] to-[#14F195] px-6 text-[14.5px] font-bold text-white shadow-[0_0_24px_rgba(153,69,255,0.4)] transition hover:brightness-110 active:scale-[0.99]"
+          >
+            View plan
+          </a>
+        </>
+      ) : (
+        <p className="mt-3 text-[13.5px] text-[#9A9AB0]">
+          No upcoming releases — every plan is fully released or paused.
+        </p>
+      )}
     </div>
   );
 }

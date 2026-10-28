@@ -1,12 +1,26 @@
 import React from 'react';
-import {
-  CURVE_POINTS,
-  CURVE_MONTHS,
-  X_LABELS,
-  Y_LABELS,
-} from './previewData';
 
-export default function ReleaseCurve() {
+export interface CurvePoint {
+  month: number;
+  pct: number;
+}
+
+export interface CurveXLabel {
+  month: number;
+  label: string;
+}
+
+interface ReleaseCurveProps {
+  points: CurvePoint[];
+  months: number;
+  xLabels: CurveXLabel[];
+  ariaLabel: string;
+  tgeLabel: string;
+}
+
+const Y_LABELS = [0, 25, 50, 75, 100];
+
+export default function ReleaseCurve({ points, months, xLabels, ariaLabel, tgeLabel }: ReleaseCurveProps) {
   const PAD_L = 44;
   const PAD_R = 16;
   const PAD_T = 16;
@@ -14,19 +28,21 @@ export default function ReleaseCurve() {
   const W = 640;
   const H = 260;
 
-  const x = (month: number) => PAD_L + (month / CURVE_MONTHS) * (W - PAD_L - PAD_R);
+  const x = (month: number) => PAD_L + (month / months) * (W - PAD_L - PAD_R);
   const y = (pct: number) => PAD_T + (1 - pct / 100) * (H - PAD_T - PAD_B);
 
   // Line path points
-  const lineD = CURVE_POINTS.reduce((acc, pt, index) => {
+  const lineD = points.reduce((acc, pt, index) => {
     const cmd = index === 0 ? 'M' : 'L';
     return `${acc} ${cmd} ${x(pt.month)} ${y(pt.pct)}`;
   }, '');
 
   // Closed area path for gradient fill
-  const firstPt = CURVE_POINTS[0];
-  const lastPt = CURVE_POINTS[CURVE_POINTS.length - 1];
+  const firstPt = points[0];
+  const lastPt = points[points.length - 1];
   const areaD = `${lineD} L ${x(lastPt.month)} ${y(0)} L ${x(firstPt.month)} ${y(0)} Z`;
+
+  const tgePct = points[0]?.pct ?? 0;
 
   return (
     <div className="relative mt-2">
@@ -34,7 +50,7 @@ export default function ReleaseCurve() {
         viewBox={`0 0 ${W} ${H}`}
         className="h-auto w-full select-none"
         role="img"
-        aria-label="Release curve: 10 percent unlocked at TGE, flat during the 3-month cliff, then monthly releases to 100 percent by February 2029"
+        aria-label={ariaLabel}
       >
         <defs>
           <linearGradient id="curveFill" x1="0" y1="0" x2="0" y2="1">
@@ -95,31 +111,31 @@ export default function ReleaseCurve() {
         {/* TGE Indicator Node */}
         <circle
           cx={x(0)}
-          cy={y(10)}
+          cy={y(tgePct)}
           r={10}
           fill="#14F195"
           opacity={0.25}
         />
         <circle
           cx={x(0)}
-          cy={y(10)}
+          cy={y(tgePct)}
           r={5}
           fill="#14F195"
         />
         <text
           x={x(0) + 12}
-          y={y(10) - 8}
+          y={y(tgePct) - 8}
           fill="#14F195"
           fontSize={12}
           fontWeight={700}
           fontFamily="var(--font-space-grotesk), sans-serif"
         >
-          TGE 10%
+          {tgeLabel}
         </text>
 
         {/* X-axis labels */}
-        {X_LABELS.map((item, i) => {
-          const isLast = i === X_LABELS.length - 1;
+        {xLabels.map((item, i) => {
+          const isLast = i === xLabels.length - 1;
           return (
             <text
               key={item.label}

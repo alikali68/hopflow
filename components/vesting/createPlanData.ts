@@ -1,3 +1,8 @@
+/** Wizard step labels + the "how vesting works" card. The plan
+ * constants (DEFAULT_PLAN_NAME / DEFAULT_MINT / DEFAULT_TOTAL_AMOUNT /
+ * TOKEN_SYMBOL) moved to lib/vesting.ts in M4 step 6 — the store owns
+ * the draft now. */
+
 export const VESTING_WIZARD_STEPS = ['Plan', 'Beneficiaries', 'Schedule', 'Preview'];
 
 export const HOW_VESTING_STEPS = [
@@ -5,8 +10,3 @@ export const HOW_VESTING_STEPS = [
   'Add beneficiaries & schedule',
   'Automatic releases',
 ];
-
-export const DEFAULT_PLAN_NAME = 'Core Team Vesting';
-export const DEFAULT_MINT = '5QK3bY9mZxFqU4wE2rR7tL8vJ1pN6hCqD9sK4mP2nA3e';
-export const DEFAULT_TOTAL_AMOUNT = '1,000,000';
-export const TOKEN_SYMBOL = 'FLOW';

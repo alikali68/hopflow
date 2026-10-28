@@ -1,9 +1,9 @@
 'use client';
 
 import React from 'react';
-import type { VestingPlan } from './vestingData';
+import type { PlanStatus } from '@/lib/vesting';
 
-export type VestingFilter = 'All' | VestingPlan['status'];
+export type VestingFilter = 'All' | PlanStatus;
 
 const OPTIONS: VestingFilter[] = ['All', 'Active', 'Cliff', 'Completed'];
 

@@ -118,6 +118,14 @@ export function formatShortDateTz(date: Date | null): string {
   return `${p.month} ${p.day}, ${p.year} · ${tzLabel(date)}`;
 }
 
+/** "Nov 1, 2026" — short date in the user's timezone, WITHOUT the zone
+ * label. Only for compact tables where the page already carries the
+ * zone label next to the table (the summary / preview cards). */
+export function formatShortDateTzBare(date: Date): string {
+  const p = zoneParts(date, 'short');
+  return `${p.month} ${p.day}, ${p.year}`;
+}
+
 /** "09:00 Helsinki (GMT+2)" — time of day in the user's timezone, labelled. */
 export function formatTimeTz(date: Date | null): string {
   if (!date) return '—';

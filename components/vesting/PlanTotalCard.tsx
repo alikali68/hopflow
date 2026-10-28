@@ -1,13 +1,11 @@
 import React from 'react';
 import { WalletIcon } from '../icons';
-import {
-  PLAN_TOTAL,
-  PLAN_TOKEN,
-  SEED_BENEFICIARIES,
-  formatFlow,
-} from './beneficiariesData';
+import { formatFlow } from './beneficiariesData';
+import type { VestingDraft } from '@/lib/vesting';
 
-export default function PlanTotalCard() {
+export default function PlanTotalCard({ draft }: { draft: VestingDraft }) {
+  const total = parseFloat(draft.totalAmount.replace(/,/g, '')) || 0;
+
   return (
     <div className="glass-panel rounded-2xl p-5">
       {/* Header */}
@@ -25,21 +23,21 @@ export default function PlanTotalCard() {
         <div className="flex items-center justify-between border-b border-white/[0.06] py-2.5 first:pt-0">
           <span className="text-[13.5px] text-[#9A9AB0]">Total locked</span>
           <span className="font-display text-[14px] font-bold text-white">
-            {formatFlow(PLAN_TOTAL)} {PLAN_TOKEN}
+            {formatFlow(total)} {draft.token}
           </span>
         </div>
 
         <div className="flex items-center justify-between border-b border-white/[0.06] py-2.5">
           <span className="text-[13.5px] text-[#9A9AB0]">Beneficiaries</span>
           <span className="font-display text-[14px] font-bold text-white">
-            {SEED_BENEFICIARIES.length}
+            {draft.beneficiaries.length}
           </span>
         </div>
 
         <div className="flex items-center justify-between py-2.5 pb-0">
           <span className="text-[13.5px] text-[#9A9AB0]">Token</span>
           <span className="font-display text-[14px] font-bold text-white">
-            {PLAN_TOKEN}
+            {draft.token}
           </span>
         </div>
       </div>

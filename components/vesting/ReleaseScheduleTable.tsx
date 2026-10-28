@@ -1,14 +1,9 @@
 import React from 'react';
-import {
-  TGE_ROW,
-  FIRST_MONTHLY_ROWS,
-  COLLAPSED_LABEL,
-  FINAL_ROW,
-  ReleaseRow,
-} from './previewData';
-import { formatFlow, PLAN_TOKEN } from './beneficiariesData';
+import type { ReleaseRow } from '@/lib/vesting';
+import { formatFlow } from './beneficiariesData';
+import { formatShortDateTzBare } from '@/lib/dates';
 
-function Row({ row, isFinal }: { row: ReleaseRow; isFinal?: boolean }) {
+function Row({ row, isFinal, token }: { row: ReleaseRow; isFinal?: boolean; token: string }) {
   return (
     <div
       className={`flex items-center justify-between gap-4 py-2.5 ${
@@ -16,7 +11,7 @@ function Row({ row, isFinal }: { row: ReleaseRow; isFinal?: boolean }) {
       }`}
     >
       <span className="w-[130px] shrink-0 text-[14px] font-semibold text-white">
-        {row.date}
+        {formatShortDateTzBare(new Date(row.date))}
       </span>
       <span
         className={`w-[110px] shrink-0 text-[13.5px] ${
@@ -26,20 +21,28 @@ function Row({ row, isFinal }: { row: ReleaseRow; isFinal?: boolean }) {
         {row.label}
       </span>
       <span className="flex-1 text-right font-display text-[14px] font-bold text-white">
-        {formatFlow(row.amount)} {PLAN_TOKEN}
+        {formatFlow(row.amount)} {token}
       </span>
       <span
         className={`w-[140px] shrink-0 text-right font-display text-[14px] font-bold ${
           isFinal ? 'text-[#14F195]' : 'text-white'
         }`}
       >
-        {formatFlow(row.cumulative)} {PLAN_TOKEN}
+        {formatFlow(row.cumulative)} {token}
       </span>
     </div>
   );
 }
 
-export default function ReleaseScheduleTable() {
+interface ReleaseScheduleTableProps {
+  tgeRow: ReleaseRow | null;
+  firstRows: ReleaseRow[];
+  collapsedLabel: string;
+  finalRow: ReleaseRow | null;
+  token: string;
+}
+
+export default function ReleaseScheduleTable({ tgeRow, firstRows, collapsedLabel, finalRow, token }: ReleaseScheduleTableProps) {
   return (
     <div className="mt-2 flex flex-col">
       {/* Table Header */}
@@ -59,20 +62,22 @@ export default function ReleaseScheduleTable() {
       </div>
 
       {/* TGE Entry */}
-      <Row row={TGE_ROW} />
+      {tgeRow && <Row row={tgeRow} token={token} />}
 
       {/* First Monthly Releases */}
-      {FIRST_MONTHLY_ROWS.map((r) => (
-        <Row key={r.date} row={r} />
+      {firstRows.map((r) => (
+        <Row key={r.date} row={r} token={token} />
       ))}
 
       {/* Collapsed Middle Releases Row */}
-      <div className="border-b border-white/[0.06] py-2.5 text-center text-[13px] text-[#9A9AB0]">
-        {COLLAPSED_LABEL}
-      </div>
+      {collapsedLabel && (
+        <div className="border-b border-white/[0.06] py-2.5 text-center text-[13px] text-[#9A9AB0]">
+          {collapsedLabel}
+        </div>
+      )}
 
       {/* Final Release */}
-      <Row row={FINAL_ROW} isFinal />
+      {finalRow && <Row row={finalRow} isFinal token={token} />}
     </div>
   );
 }

@@ -1,12 +1,11 @@
 import React from 'react';
 import { UsersIcon } from '../icons';
-import {
-  SEED_BENEFICIARIES,
-  formatFlow,
-  shareAmount,
-} from './beneficiariesData';
+import { formatFlow } from './beneficiariesData';
+import { type VestingDraft, shareAmountOf } from '@/lib/vesting';
 
-export default function AllocationPreviewCard() {
+export default function AllocationPreviewCard({ draft }: { draft: VestingDraft }) {
+  const total = parseFloat(draft.totalAmount.replace(/,/g, '')) || 0;
+
   return (
     <div className="glass-panel rounded-2xl p-5">
       {/* Header */}
@@ -21,7 +20,7 @@ export default function AllocationPreviewCard() {
 
       {/* Beneficiaries Preview List */}
       <div className="mt-5 flex flex-col gap-4">
-        {SEED_BENEFICIARIES.map((beneficiary) => (
+        {draft.beneficiaries.map((beneficiary) => (
           <div key={beneficiary.id} className="flex items-start gap-2.5">
             <span
               className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-gradient-to-r from-[#9945FF] to-[#14F195] shadow-[0_0_8px_rgba(20,241,149,0.5)]"
@@ -29,10 +28,10 @@ export default function AllocationPreviewCard() {
             />
             <div className="flex flex-col">
               <span className="text-[14px] font-semibold text-white">
-                {beneficiary.name}
+                {beneficiary.name.trim() || 'Unnamed beneficiary'}
               </span>
               <span className="mt-0.5 text-[13px] text-[#9A9AB0]">
-                {beneficiary.sharePercent}% · {formatFlow(shareAmount(beneficiary.sharePercent))} FLOW
+                {beneficiary.sharePercent}% · {formatFlow(shareAmountOf(total, beneficiary.sharePercent))} {draft.token}
               </span>
             </div>
           </div>

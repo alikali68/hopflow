@@ -1,16 +1,20 @@
 import React from 'react';
 import { GripIcon, TrashIcon } from '../icons';
 import {
-  Beneficiary,
   isValidSolanaAddress,
   formatFlow,
-  shareAmount,
 } from './beneficiariesData';
+import type { VestingDraftBeneficiary } from '@/lib/vesting';
+import { shareAmountOf } from '@/lib/vesting';
 
 interface BeneficiaryRowProps {
-  beneficiary: Beneficiary;
+  beneficiary: VestingDraftBeneficiary;
   index: number;
-  onChange: (patch: Partial<Beneficiary>) => void;
+  /** Plan total — the share amount is computed from the draft, not a
+   * hardcoded constant. */
+  total: number;
+  token: string;
+  onChange: (patch: Partial<VestingDraftBeneficiary>) => void;
   onRemove: () => void;
   canRemove: boolean;
 }
@@ -18,6 +22,8 @@ interface BeneficiaryRowProps {
 export default function BeneficiaryRow({
   beneficiary,
   index,
+  total,
+  token,
   onChange,
   onRemove,
   canRemove,
@@ -101,7 +107,7 @@ export default function BeneficiaryRow({
         </div>
 
         <span className="whitespace-nowrap font-display text-[14px] font-bold text-white">
-          {formatFlow(shareAmount(beneficiary.sharePercent))} FLOW
+          {formatFlow(shareAmountOf(total, beneficiary.sharePercent))} {token}
         </span>
 
         <button

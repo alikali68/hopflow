@@ -1,25 +1,22 @@
 'use client';
 
-import React, { useState } from 'react';
+import React from 'react';
 import { ArrowLeftIcon, ChevronRightIcon } from '../icons';
 import DatePicker from '../ui/DatePicker';
-import { formatLongDate } from '@/lib/dates';
+import { formatLongDate, formatLongDateTz, parseShortDate } from '@/lib/dates';
 import {
   CLIFF_OPTIONS,
-  DEFAULT_CLIFF,
   DURATION_OPTIONS,
-  DEFAULT_DURATION_MONTHS,
   FREQUENCY_OPTIONS,
-  DEFAULT_FREQUENCY,
   TGE_OPTIONS,
-  DEFAULT_TGE,
-  DEFAULT_START_DATE,
   cliffLabel,
   frequencyLabel,
-  endDate,
-  tgeAmount,
-  Frequency,
-} from './scheduleData';
+  tgeAmountOf,
+  firstReleaseDate,
+  addMonthsWall,
+  type VestingFrequency,
+} from '@/lib/vesting';
+import { useVesting } from '@/lib/store';
 import { formatFlow } from './beneficiariesData';
 
 function WhiteCheck({ size = 14 }: { size?: number }) {
@@ -61,14 +58,26 @@ function InfoIcon({ size = 16 }: { size?: number }) {
 }
 
 export default function VestingScheduleForm() {
-  const [startDate, setStartDate] = useState<Date>(DEFAULT_START_DATE);
-  const [cliff, setCliff] = useState<number>(DEFAULT_CLIFF);
-  const [durationMonths, setDurationMonths] = useState<number>(DEFAULT_DURATION_MONTHS);
-  const [frequency, setFrequency] = useState<Frequency>(DEFAULT_FREQUENCY);
-  const [tge, setTge] = useState<number>(DEFAULT_TGE);
+  const { draft, dispatch } = useVesting();
+  const startDate = parseShortDate(draft.startDate) ?? new Date(2026, 10, 1);
+  const cliff = draft.cliffMonths;
+  const durationMonths = draft.durationMonths;
+  const frequency = draft.frequency;
+  const tge = draft.tgePercent;
+  const total = parseFloat(draft.totalAmount.replace(/,/g, '')) || 0;
 
-  const end = endDate(startDate, cliff, durationMonths);
-  const tgeAmt = tgeAmount(tge);
+  const setDraft = (patch: Partial<typeof draft>) => {
+    dispatch({ type: 'vesting/setDraft', draft: { ...draft, ...patch } });
+  };
+
+  const setStartDate = (date: Date) => {
+    // The DatePicker shows the browser's local calendar; the stored
+    // short date is read back in the user's timezone downstream.
+    setDraft({ startDate: formatLongDate(date) });
+  };
+
+  const tgeAmt = tgeAmountOf(total, tge);
+  const end = addMonthsWall(firstReleaseDate(startDate, cliff), durationMonths);
 
   return (
     <div className="flex flex-col gap-4">
@@ -104,7 +113,7 @@ export default function VestingScheduleForm() {
                   <button
                     key={m}
                     type="button"
-                    onClick={() => setCliff(m)}
+                    onClick={() => setDraft({ cliffMonths: m })}
                     className={`flex h-[48px] min-w-[72px] flex-1 items-center justify-center gap-1.5 rounded-xl text-[15px] font-bold transition-all ${
                       isSelected
                         ? 'bg-gradient-to-r from-[#9945FF] to-[#14F195] text-white shadow-[0_0_15px_rgba(153,69,255,0.3)]'
@@ -131,7 +140,7 @@ export default function VestingScheduleForm() {
                   <button
                     key={m}
                     type="button"
-                    onClick={() => setDurationMonths(m)}
+                    onClick={() => setDraft({ durationMonths: m })}
                     className={`flex h-[48px] min-w-[72px] flex-1 items-center justify-center gap-1.5 rounded-xl text-[15px] font-bold transition-all ${
                       isSelected
                         ? 'bg-gradient-to-r from-[#9945FF] to-[#14F195] text-white shadow-[0_0_15px_rgba(153,69,255,0.3)]'
@@ -152,13 +161,13 @@ export default function VestingScheduleForm() {
               Release frequency
             </label>
             <div className="flex flex-wrap gap-2">
-              {FREQUENCY_OPTIONS.map((f) => {
+              {FREQUENCY_OPTIONS.map((f: VestingFrequency) => {
                 const isSelected = frequency === f;
                 return (
                   <button
                     key={f}
                     type="button"
-                    onClick={() => setFrequency(f)}
+                    onClick={() => setDraft({ frequency: f })}
                     className={`flex h-[48px] min-w-[72px] flex-1 items-center justify-center gap-1.5 rounded-xl text-[15px] font-bold transition-all ${
                       isSelected
                         ? 'bg-gradient-to-r from-[#9945FF] to-[#14F195] text-white shadow-[0_0_15px_rgba(153,69,255,0.3)]'
@@ -185,7 +194,7 @@ export default function VestingScheduleForm() {
                   <button
                     key={p}
                     type="button"
-                    onClick={() => setTge(p)}
+                    onClick={() => setDraft({ tgePercent: p })}
                     className={`flex h-[48px] min-w-[72px] flex-1 items-center justify-center gap-1.5 rounded-xl text-[15px] font-bold transition-all ${
                       isSelected
                         ? 'bg-gradient-to-r from-[#9945FF] to-[#14F195] text-white shadow-[0_0_15px_rgba(153,69,255,0.3)]'
@@ -201,7 +210,7 @@ export default function VestingScheduleForm() {
             <p className="mt-2 text-[12px] text-[#9A9AB0]">
               {tge === 0
                 ? 'No tokens unlock at the start date — the first release is after the cliff.'
-                : `${tge}% unlocks at the start date — ${formatFlow(tgeAmt)} FLOW paid on ${formatLongDate(startDate)}.`}
+                : `${tge}% unlocks at the start date — ${formatFlow(tgeAmt)} ${draft.token} paid on ${formatLongDate(startDate)}.`}
             </p>
           </div>
 
@@ -212,7 +221,7 @@ export default function VestingScheduleForm() {
             </span>
             <span>
               Tokens unlock on schedule — the first release happens after the cliff, then every{' '}
-              {frequency === 'monthly' ? 'month' : 'week'} until {formatLongDate(end)}.
+              {frequency === 'monthly' ? 'month' : 'week'} until {formatLongDateTz(end)}.
             </span>
           </div>
 
