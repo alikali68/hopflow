@@ -4,7 +4,7 @@
 import React, { useState } from 'react';
 import { ArrowLeftIcon, CheckCircleIcon, LockIcon, WalletIcon } from '../icons';
 import { type FreelanceDraft, fmt0, protocolFee } from '@/lib/freelance';
-import { useStore } from '@/lib/store';
+import { useStore, useFreelance } from '@/lib/store';
 import { useWalletModal } from '@solana/wallet-adapter-react-ui';
 import { isValidSolanaAddress } from '../payroll/addMembersData';
 
@@ -17,6 +17,7 @@ interface SignPanelProps {
 
 export default function SignPanel({ draft, balance, walletConnected }: SignPanelProps) {
   const { state, dispatch } = useStore();
+  const { projects } = useFreelance();
   const { setVisible } = useWalletModal();
   const [done, setDone] = useState(false);
 
@@ -56,13 +57,23 @@ export default function SignPanel({ draft, balance, walletConnected }: SignPanel
         </a>
 
         {done ? (
-          <a
-            href="/freelance"
-            className="flex h-[46px] items-center gap-2 rounded-xl bg-gradient-to-r from-[#9945FF] to-[#14F195] px-6 text-[14.5px] font-bold text-white shadow-[0_0_24px_rgba(20,241,149,0.4)] transition hover:brightness-110 active:scale-[0.99]"
-          >
-            <CheckCircleIcon size={17} />
-            <span>Escrow created — View projects</span>
-          </a>
+          <div className="flex flex-wrap items-center gap-2">
+            <a
+              href="/freelance"
+              className="flex h-[46px] items-center gap-2 rounded-xl bg-gradient-to-r from-[#9945FF] to-[#14F195] px-6 text-[14.5px] font-bold text-white shadow-[0_0_24px_rgba(20,241,149,0.4)] transition hover:brightness-110 active:scale-[0.99]"
+            >
+              <CheckCircleIcon size={17} />
+              <span>Escrow created — View projects</span>
+            </a>
+            {projects[0] && (
+              <a
+                href={`/freelance/${projects[0].id}#publish`}
+                className="flex h-[46px] items-center gap-2 rounded-xl border border-white/12 bg-white/[0.04] px-5 text-[14px] font-semibold text-[#B8B8C7] transition-colors hover:border-white/25 hover:text-white"
+              >
+                Publish milestones on-chain
+              </a>
+            )}
+          </div>
         ) : !validDraft ? (
           <button
             type="button"

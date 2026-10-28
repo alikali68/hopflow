@@ -30,6 +30,7 @@ export async function POST(
       routeInitSignatures?: string[];
       orchestratorInitSignature?: string;
       sessionInitSignatures?: string[];
+      dispersionInitSignatures?: string[];
     }>(req);
     if (error) return error;
     const data = await confirmBroadcast(id, body ?? {});

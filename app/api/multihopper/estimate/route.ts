@@ -15,9 +15,10 @@ export async function POST(req: NextRequest) {
       tokenDecimals?: unknown;
       hops?: unknown;
       route?: { hops?: unknown };
+      destinationCount?: unknown;
     }>(req);
     if (error) return error;
-    const { tokenMint, amountRaw, tokenDecimals, hops, route } = body ?? {};
+    const { tokenMint, amountRaw, tokenDecimals, hops, route, destinationCount } = body ?? {};
 
     if (!amountRaw || typeof amountRaw !== 'string' || !/^\d+$/.test(amountRaw) || BigInt(amountRaw) <= BigInt(0)) {
       return NextResponse.json(
@@ -33,15 +34,31 @@ export async function POST(req: NextRequest) {
 
     const decimals = Number(tokenDecimals ?? 9);
 
+    // Multi-destination estimates price dispersion rent: destinationCount
+    // must be an integer 1–20 when present, and the route then needs
+    // 3–10 hops (last hop is a decoy) instead of 2–9.
+    let destCountNum: number | undefined = undefined;
+    if (destinationCount !== undefined) {
+      destCountNum = Number(destinationCount);
+      if (!Number.isInteger(destCountNum) || destCountNum < 1 || destCountNum > 20) {
+        return NextResponse.json(
+          { error: { code: 'MH_018', message: 'destinationCount must be 1–20.' } },
+          { status: 400 }
+        );
+      }
+    }
+
     // Custom route: validate the route shape (docs: waitSeconds 20–2,592,000, 2–9 hops).
     if (route !== undefined) {
       const routeHops = route?.hops;
-      if (!Array.isArray(routeHops) || routeHops.length < 2 || routeHops.length > 9) {
+      if (!Array.isArray(routeHops) || routeHops.length < (destCountNum !== undefined ? 3 : 2) || routeHops.length > (destCountNum !== undefined ? 10 : 9)) {
         return NextResponse.json(
           {
             error: {
               code: 'MH_018',
-              message: 'route.hops must contain 2–9 hops for a transfer to one recipient.',
+              message: destCountNum !== undefined
+                ? 'route.hops must contain 3–10 hops for a multi-destination transfer.'
+                : 'route.hops must contain 2–9 hops for a transfer to one recipient.',
             },
           },
           { status: 400 }
@@ -78,6 +95,7 @@ export async function POST(req: NextRequest) {
         amountRaw: String(amountRaw),
         tokenDecimals: decimals,
         route: { hops: routeHops },
+        ...(destCountNum !== undefined ? { destinationCount: destCountNum } : {}),
       });
       return NextResponse.json(estimate);
     }

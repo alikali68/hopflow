@@ -49,6 +49,8 @@ export interface FreelanceMilestone {
   /** Real devnet signature, or null — a milestone with no txSig has no
    * on-chain record and renders NO explorer link (never a fake one). */
   txSig?: string | null;
+  /** MultiHopper transfer id that publishes this milestone, or null — a milestone with no id has no on-chain route. */
+  publishedTransferId?: string | null;
   changeRequest?: { text: string; at: string } | null;
 }
 

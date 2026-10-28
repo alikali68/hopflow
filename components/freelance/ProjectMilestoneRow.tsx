@@ -81,6 +81,18 @@ export default function ProjectMilestoneRow({ milestone, project }: ProjectMiles
             </a>
           )}
 
+          {milestone.publishedTransferId && (
+            <a
+              href={`/routes/${milestone.publishedTransferId}`}
+              className="mt-1 inline-flex items-center gap-1 text-[12.5px] font-semibold text-[#14F195] hover:brightness-110"
+            >
+              <span className="bg-gradient-to-r from-[#9945FF] to-[#14F195] bg-clip-text text-transparent">
+                View on-chain · Transfer #{milestone.publishedTransferId}
+              </span>
+              <ArrowUpRightIcon size={13} className="text-[#14F195]" />
+            </a>
+          )}
+
           {milestone.changeRequest && (
             <p className="mt-2 rounded-lg border border-[#F5C542]/25 bg-[#F5C542]/[0.06] px-3 py-2 text-[12.5px] leading-relaxed text-[#F5C542]">
               Change requested{' '}

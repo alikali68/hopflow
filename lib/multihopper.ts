@@ -26,7 +26,9 @@ export interface CreateTransferInput {
   tokenDecimals: number;
   tokenSymbol: string;
   sourceOwner: string;
-  recipientWallet: string;
+  recipientWallet?: string;
+  // Multi-destination: exactly one of recipientWallet / destinations (docs: guides/multi-destination). Shares sum exactly to amountRaw.
+  destinations?: Array<{ wallet: string; amountRaw: string }>;
   // Custom route: pass `route` INSTEAD of `hops`/`arrivalSeconds` (docs: not combined).
   hops?: number;
   arrivalSeconds?: number;
@@ -43,6 +45,7 @@ export interface PreparedTxs {
   orchestratorInitTx?: string | { base64: string };
   sessionInitTxs?: Array<string | { base64: string }>;
   keeperFundingTx?: string | { base64: string };
+  dispersionInitTxs?: Array<string | { base64: string }>; // multi-destination only: sets up the payout orchestrator.
   recentBlockhash?: string;
   lastValidBlockHeight?: number;
   [key: string]: unknown;
@@ -58,6 +61,14 @@ export interface Transfer {
   tokenDecimals?: number;
   sourceOwner?: string;
   recipientWallet?: string;
+  destinations?: Array<{
+    wallet: string;
+    amountRaw: string;
+    status?: string;
+    payoutSignature?: string | null;
+    paidAt?: string | null;
+    [key: string]: unknown;
+  }>;
   hops?: number;
   arrivalSeconds?: number;
   externalId?: string;
@@ -145,6 +156,7 @@ export async function estimateFee(input: {
   tokenDecimals: number;
   hops?: number;
   route?: { hops: RouteHopInput[] };
+  destinationCount?: number; // multi-destination estimates: prices dispersion rent.
 }): Promise<Estimate> {
   return apiRequest<Estimate>('/transfers/estimate', {
     method: 'POST',
@@ -177,6 +189,7 @@ export async function confirmBroadcast(
     routeInitSignatures?: string[];
     orchestratorInitSignature?: string;
     sessionInitSignatures?: string[];
+    dispersionInitSignatures?: string[];
   }
 ): Promise<Transfer> {
   return apiRequest<Transfer>(

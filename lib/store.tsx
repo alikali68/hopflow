@@ -248,6 +248,7 @@ export type StoreAction =
   | { type: 'freelance/saveDraft' }
   | { type: 'freelance/createProject' }
   | { type: 'freelance/claimRefund'; projectId: string }
+  | { type: 'freelance/markMilestonePublished'; projectId: string; milestoneN: number; transferId: string }
   | { type: 'freelance/cancelProject'; projectId: string }
   | { type: 'payroll/setDraft'; draft: PayrollDraft }
   | { type: 'payroll/saveDraft' }
@@ -668,6 +669,29 @@ function reducer(state: AppState, action: StoreAction): AppState {
         ...state,
         freelance: { ...state.freelance, projects: nextProjects },
         activity: appendActivity(state.activity, `Refund requested · ${project.title}`, 'amber'),
+      };
+    }
+    case 'freelance/markMilestonePublished': {
+      const project = state.freelance.projects.find((p) => p.id === action.projectId);
+      if (!project) return state;
+      const nowIso = new Date().toISOString();
+      const nextProjects = state.freelance.projects.map((p) => {
+        if (p.id !== action.projectId) return p;
+        return {
+          ...p,
+          milestones: p.milestones.map((m) =>
+            m.n === action.milestoneN ? { ...m, publishedTransferId: action.transferId } : m,
+          ),
+          activity: [
+            { title: `Milestone ${action.milestoneN} published on-chain`, caption: `Transfer #${action.transferId} — track it on the tracking page`, at: nowIso },
+            ...p.activity,
+          ],
+        };
+      });
+      return {
+        ...state,
+        freelance: { ...state.freelance, projects: nextProjects },
+        activity: appendActivity(state.activity, `Milestone published on-chain · ${project.title}`, 'green'),
       };
     }
     case 'payroll/setDraft': {

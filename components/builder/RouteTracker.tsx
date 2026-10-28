@@ -20,6 +20,7 @@ import {
   explorerTxUrl,
 } from './trackingData';
 import RouteTimeline from './RouteTimeline';
+import DestinationPayouts from './DestinationPayouts';
 import SampleRouteView from './SampleRouteView';
 import {
   AlertIcon,
@@ -396,6 +397,8 @@ export default function RouteTracker({ id }: RouteTrackerProps) {
               amountTokens={amountNumber}
               tokenSymbol={isDemo ? demoRoute.tokenSymbol : 'SOL'}
             />
+
+            {!isDemo && record && <DestinationPayouts record={record} />}
           </div>
 
           {/* Rail Column */}

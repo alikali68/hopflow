@@ -5,6 +5,7 @@ import React, { useEffect } from 'react';
 import AppShell from '@/components/app/AppShell';
 import ProjectHeader from '@/components/freelance/ProjectHeader';
 import ProjectMilestoneRow from '@/components/freelance/ProjectMilestoneRow';
+import PublishEscrowPanel from '@/components/freelance/PublishEscrowPanel';
 import VaultCard from '@/components/freelance/VaultCard';
 import ActivityCard from '@/components/freelance/ActivityCard';
 import { useFreelance } from '@/lib/store';
@@ -20,10 +21,15 @@ export default function ProjectDetailPage({
   const project = projects.find((p) => p.id === id);
 
   // Review links land here as /freelance/<id>#review — scroll to the
-  // delivered milestone's approval box after mount.
+  // delivered milestone's approval box after mount. Publish links land as
+  // /freelance/<id>#publish — scroll to the Publish on-chain panel.
   useEffect(() => {
     if (window.location.hash === '#review') {
       const el = document.getElementById('review');
+      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+    if (window.location.hash === '#publish') {
+      const el = document.getElementById('publish');
       if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
     }
   }, [id, project?.id]);
@@ -92,6 +98,11 @@ export default function ProjectDetailPage({
             <VaultCard project={project} />
             <ActivityCard project={project} />
           </aside>
+
+          {/* Publish on-chain: main column, row 2. Placed AFTER the aside on
+              purpose — grid auto-placement would otherwise put it in the
+              320px rail column if it sat between the section and the aside. */}
+          <PublishEscrowPanel project={project} />
         </div>
       </div>
     </AppShell>
