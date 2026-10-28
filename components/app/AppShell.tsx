@@ -1,6 +1,7 @@
 import React from 'react';
 import Sidebar from './Sidebar';
 import DemoBadge from './DemoBadge';
+import WelcomeOverlay from './WelcomeOverlay';
 
 export default function AppShell({
   children,
@@ -32,6 +33,9 @@ export default function AppShell({
           </main>
         </div>
       </div>
+      {/* First-entry welcome, once per wallet in real mode (see the
+          component — demo mode never shows it). */}
+      <WelcomeOverlay />
     </div>
   );
 }

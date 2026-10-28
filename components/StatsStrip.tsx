@@ -1,8 +1,9 @@
 'use client';
 
 import React, { useMemo } from 'react';
+import { useWallet } from '@solana/wallet-adapter-react';
 import { type StatItem } from './data';
-import { useRoutes, useFreelance, usePayroll, useVesting } from '@/lib/store';
+import { useStore, useRoutes, useFreelance, usePayroll, useVesting } from '@/lib/store';
 import { computeAppCounts } from '@/lib/counts';
 import { TrendArrowIcon } from './icons';
 
@@ -14,10 +15,16 @@ import { TrendArrowIcon } from './icons';
 // (M4 counts wiring); first paint shows the seed counts, the store
 // hydrates from localStorage afterwards, exactly like the dashboard.
 export default function StatsStrip() {
+  const { state } = useStore();
+  const { connected } = useWallet();
   const { routes } = useRoutes();
   const { projects } = useFreelance();
   const { teams } = usePayroll();
   const { plans } = useVesting();
+  // The strip shows the store's numbers. They are sample data in demo
+  // mode and for logged-out visitors — but a connected wallet in real
+  // mode sees its OWN numbers, so the caption says so.
+  const isSample = state.demoMode || !connected;
   const counts = useMemo(
     () => computeAppCounts(routes, projects, teams, plans, new Date()),
     [routes, projects, teams, plans],
@@ -100,7 +107,7 @@ export default function StatsStrip() {
         </div>
       </div>
       <p className="mt-3 text-center text-[12px] font-medium text-textMuted">
-        Sample data · HopFlow beta · Solana Devnet
+        {isSample ? 'Sample data' : 'Your data'} · HopFlow beta · Solana Devnet
       </p>
     </section>
   );

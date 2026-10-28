@@ -6,7 +6,7 @@ import Topbar from '@/components/app/Topbar';
 import { useWallet } from '@solana/wallet-adapter-react';
 import { WalletMultiButton, useWalletModal } from '@solana/wallet-adapter-react-ui';
 import { clearSessionAuth } from '@/lib/session';
-import { STORE_KEY, useStore, useTimezone } from '@/lib/store';
+import { clearWelcomed, useStore, useTimezone } from '@/lib/store';
 import { setEffectiveTimeZone } from '@/lib/dates';
 import {
   TIMEZONE_CHOICES,
@@ -51,7 +51,7 @@ const dangerBtn =
 export default function SettingsPage() {
   const { publicKey, connected, disconnect } = useWallet();
   const { setVisible } = useWalletModal();
-  const { state, dispatch } = useStore();
+  const { state, dispatch, storeKey } = useStore();
   const { mode, zone, resolved, detected } = useTimezone();
   const [clearState, setClearState] = useState<'idle' | 'confirm' | 'done'>('idle');
   const [resetDone, setResetDone] = useState(false);
@@ -77,9 +77,9 @@ export default function SettingsPage() {
     }
   };
 
-  const refreshStoredSize = () => {
+  const refreshStoredSize = (key: string) => {
     try {
-      const raw = window.localStorage.getItem(STORE_KEY);
+      const raw = window.localStorage.getItem(key);
       setStoredBytes(raw ? new Blob([raw]).size : 0);
     } catch {
       setStoredBytes(0);
@@ -87,8 +87,8 @@ export default function SettingsPage() {
   };
 
   useEffect(() => {
-    refreshStoredSize();
-  }, []);
+    refreshStoredSize(storeKey);
+  }, [storeKey]);
 
   const handleDisconnect = () => {
     // End the entry session too — a new wallet must sign again on entry.
@@ -98,23 +98,27 @@ export default function SettingsPage() {
 
   const handleClearSavedData = () => {
     try {
-      window.localStorage.removeItem(STORE_KEY);
+      // Erase the ACTIVE key (demo key, or this wallet's own key).
+      window.localStorage.removeItem(storeKey);
+      // Clearing erases the wallet's workspace: the welcome shows again
+      // on next entry (no stored data = first entry for that wallet).
+      if (publicKey) clearWelcomed(publicKey.toBase58());
     } catch {
       // Storage unavailable — the in-memory reset below still applies.
     }
     dispatch({ type: 'session/resetAll' });
     setClearState('done');
     setResetDone(false);
-    // The store persist effect re-stores the seed state right after the
-    // reset; re-read the size so the readout stays truthful.
-    window.setTimeout(refreshStoredSize, 150);
+    // The store persist effect re-stores the seed/empty state right after
+    // the reset; re-read the size so the readout stays truthful.
+    window.setTimeout(() => refreshStoredSize(storeKey), 150);
   };
 
   const handleResetDemoData = () => {
     dispatch({ type: 'builder/resetToSeed' });
     setResetDone(true);
     setClearState('idle');
-    window.setTimeout(refreshStoredSize, 150);
+    window.setTimeout(() => refreshStoredSize(storeKey), 150);
   };
 
   return (
@@ -239,8 +243,10 @@ export default function SettingsPage() {
           description="Your routes and settings live only in this browser (localStorage). Nothing is sent to a HopFlow server."
         >
           <p className="text-[13px] leading-[20px] text-textMuted">
-            Stored in this browser: builder route draft (hops, schedule, mode) and the demo-mode
-            flag. Key: <code className="font-mono text-[12px] text-white">{STORE_KEY}</code>
+            {state.demoMode
+              ? 'Stored in this browser: the sample data you are exploring.'
+              : 'Stored in this browser: your workspace, under this wallet only — each wallet sees only its own data.'}{' '}
+            Key: <code className="font-mono text-[12px] text-white">{storeKey}</code>
             {storedBytes !== null && (
               <>
                 {' '}·{' '}
@@ -273,13 +279,20 @@ export default function SettingsPage() {
                 Clear saved data
               </button>
             )}
-            <button type="button" onClick={handleResetDemoData} className={secondaryBtn}>
-              Reset demo data
-            </button>
+            {/* "Reset demo data" is a demo-mode affordance: in real mode
+                there is no sample data to restore — "Clear saved data"
+                is the erase path. */}
+            {state.demoMode && (
+              <button type="button" onClick={handleResetDemoData} className={secondaryBtn}>
+                Reset demo data
+              </button>
+            )}
           </div>
           {clearState === 'done' && (
             <p role="status" className="text-[13px] font-medium text-[#14F195]">
-              Saved data cleared — the app now shows the original sample data.
+              {state.demoMode
+                ? 'Saved data cleared — the app now shows the original sample data.'
+                : 'Saved data cleared — your workspace is empty.'}
             </p>
           )}
           {resetDone && (

@@ -91,12 +91,22 @@ export function seedBuilderRoute(): StoreRoute {
 /** Re-derive the builder draft row from the current builder slice.
  * Called by the store whenever hops/schedules/mode change, so the
  * dashboard row never goes stale. A draft is never published, so
- * hopsExecuted stays 0 and its status stays Scheduled. */
+ * hopsExecuted stays 0 and its status stays Scheduled.
+ *
+ * `opts.appendDraft` (default true): when false and the draft row is
+ * absent, it is NOT appended. The store passes false for a fresh
+ * real-mode wallet whose builder was never edited — otherwise the
+ * timezone-resolution effect alone would conjure a "Builder Draft
+ * Route" row into an empty workspace. Once the user edits the builder
+ * (builderVersion > 0) the draft row appears, because it is then their
+ * own draft. In demo mode the row is already seeded, so the flag is a
+ * no-op there. */
 export function syncBuilderRoute(
   routes: StoreRoute[],
   hops: HopDraft[],
   schedules: HopSchedule[],
   mode: ScheduleMode,
+  opts?: { appendDraft?: boolean },
 ): StoreRoute[] {
   const executions = computeExecutionTimes(mode, hops, schedules, new Date());
   const draft: StoreRoute = {
@@ -114,6 +124,7 @@ export function syncBuilderRoute(
     wallets: hops.map((h) => h.wallet),
   };
   const found = routes.some((r) => r.id === BUILDER_ROUTE_ID);
+  if (!found && opts?.appendDraft === false) return routes;
   return found ? routes.map((r) => (r.id === BUILDER_ROUTE_ID ? draft : r)) : [...routes, draft];
 }
 

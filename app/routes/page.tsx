@@ -1,17 +1,21 @@
 'use client';
 
 import React, { useMemo, useState } from 'react';
+import { useWallet } from '@solana/wallet-adapter-react';
 import AppShell from '@/components/app/AppShell';
 import Topbar from '@/components/app/Topbar';
 import RouteRow from '@/components/dashboard/RouteRow';
 import EmptyState from '@/components/dashboard/EmptyState';
-import { useRoutes } from '@/lib/store';
+import { useStore, useRoutes } from '@/lib/store';
 import { routeMatchesQuery, type RouteStatus } from '@/lib/routes';
 
 type Filter = 'All' | RouteStatus;
 const OPTIONS: Filter[] = ['All', 'Active', 'Paused', 'Scheduled', 'Completed'];
 
 export default function RoutesListPage() {
+  const { state } = useStore();
+  const { connected } = useWallet();
+  const showSample = state.demoMode || !connected;
   const { routes } = useRoutes();
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState<Filter>('All');
@@ -60,7 +64,10 @@ export default function RoutesListPage() {
         <div className="flex items-baseline gap-2.5 pb-4">
           <h2 className="font-display text-[18px] font-bold text-white">All Routes</h2>
           <span className="text-[12px] font-medium text-[#9A9AB0]">
-            {filtered.length} of {routes.length} routes · Sample data
+            {filtered.length} of {routes.length} routes
+            {/* "Sample data" whenever the rows ARE samples: demo mode, or
+                a logged-out visitor previewing the seed data. */}
+            {showSample ? ' · Sample data' : ''}
           </span>
         </div>
 

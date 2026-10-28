@@ -4,10 +4,14 @@
  * HopFlow shared store — the single source of truth for the app.
  *
  * - React Context + useReducer, no new dependencies.
- * - Persisted to localStorage under a versioned key. SSR-safe: the first
- *   render (server + client) always uses the seed state, so there is no
- *   hydration mismatch; the stored state is applied after mount, and every
- *   later change is written back.
+ * - Persisted to localStorage under a versioned key: the demo key
+ *   (`hopflow-store-v1`) holds the sample data in demo mode and for
+ *   logged-out visitors; real mode stores each wallet's workspace under
+ *   its own per-wallet key (`hopflow-store-v1:<address>`), starting
+ *   EMPTY for a brand-new wallet. SSR-safe: the first render (server +
+ *   client) always uses the seed state, so there is no hydration
+ *   mismatch; the stored state is applied after mount, and every later
+ *   change is written back.
  * - SECURITY: the store holds app data ONLY (hops, schedules, UI state).
  *   Never put the API key, wallet secrets, or private keys here — the
  *   MultiHopper key lives only in `.env.local` on the server.
@@ -74,6 +78,7 @@ import {
 import { isValidSolanaAddress as isValidPayrollAddress } from '@/components/payroll/addMembersData';
 import { parseShortDate, setEffectiveTimeZone } from './dates';
 import { combineDateTime } from './route-time';
+import { useWallet } from '@solana/wallet-adapter-react';
 import {
   DEFAULT_TIME_ZONE,
   detectUserTimeZone,
@@ -83,6 +88,56 @@ import {
 
 export const STORE_KEY = 'hopflow-store-v1';
 export const STORE_VERSION = 1;
+
+/** Per-wallet store key for real (non-demo) mode. Each wallet sees only
+ * its own workspace: data created under wallet A never appears under
+ * wallet B. The demo key (STORE_KEY) keeps the seed/sample data and is
+ * used in demo mode and by logged-out visitors. */
+export function storeKeyFor(address: string): string {
+  return `${STORE_KEY}:${address}`;
+}
+
+/** Registry of wallet addresses that already saw the first-entry welcome
+ * (one entry per wallet — the welcome shows on first entry only). The
+ * registry holds addresses only, no data. */
+export const WELCOMED_KEY = 'hopflow-welcomed-v1';
+
+export function loadWelcomed(): string[] {
+  try {
+    const raw = window.localStorage.getItem(WELCOMED_KEY);
+    if (!raw) return [];
+    const parsed: unknown = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter((v): v is string => typeof v === 'string');
+  } catch {
+    return [];
+  }
+}
+
+export function hasWelcomed(address: string): boolean {
+  return loadWelcomed().includes(address);
+}
+
+export function markWelcomed(address: string): void {
+  try {
+    const list = loadWelcomed();
+    if (!list.includes(address)) {
+      list.push(address);
+      window.localStorage.setItem(WELCOMED_KEY, JSON.stringify(list));
+    }
+  } catch {
+    // Storage unavailable — the welcome may show again; harmless.
+  }
+}
+
+export function clearWelcomed(address: string): void {
+  try {
+    const list = loadWelcomed().filter((a) => a !== address);
+    window.localStorage.setItem(WELCOMED_KEY, JSON.stringify(list));
+  } catch {
+    // Storage unavailable — nothing to clear.
+  }
+}
 
 export interface BuilderState {
   hops: HopDraft[];
@@ -265,6 +320,27 @@ function seedAppState(): AppState {
   };
 }
 
+/** Empty workspace for a brand-new wallet in real (non-demo) mode: no
+ * seed routes, projects, teams, plans or activity — the user starts from
+ * zero and creates their own data. The builder keeps its draft template
+ * (an unsaved draft, not a created route) and the wizard drafts keep
+ * their empty templates; the timezone preference is inherited from the
+ * current settings so a manual zone is not lost when a wallet first
+ * connects. Demo mode never uses this — it keeps the seed state. */
+export function emptyAppState(settings?: AppSettings): AppState {
+  return {
+    version: STORE_VERSION,
+    builder: seedBuilderState(),
+    demoMode: false,
+    routes: [],
+    activity: [],
+    freelance: { projects: [], draft: seedFreelanceDraft() },
+    payroll: { teams: [], draft: seedPayrollDraft(), lastCreatedTeamId: null },
+    vesting: { plans: [], draft: seedVestingDraft(), lastCreatedPlanId: null },
+    settings: settings ?? seedSettings(),
+  };
+}
+
 /** Every hop needs a schedule — fill in defaults for hops that lack one (new/added hops), drop the rest. */
 function syncSchedules(hops: HopDraft[], schedules: HopSchedule[]): HopSchedule[] {
   return hops.map((hop, i) => {
@@ -358,7 +434,10 @@ function reducer(state: AppState, action: StoreAction): AppState {
       return {
         ...state,
         builder: nextBuilder,
-        routes: syncBuilderRoute(state.routes, nextBuilder.hops, nextBuilder.schedules, nextBuilder.mode),
+        routes: syncBuilderRoute(state.routes, nextBuilder.hops, nextBuilder.schedules, nextBuilder.mode, {
+          // The builder was just edited: the draft row is the user's own draft.
+          appendDraft: true,
+        }),
       };
     }
     case 'builder/setSchedules': {
@@ -367,7 +446,10 @@ function reducer(state: AppState, action: StoreAction): AppState {
       return {
         ...state,
         builder: nextBuilder,
-        routes: syncBuilderRoute(state.routes, nextBuilder.hops, nextBuilder.schedules, nextBuilder.mode),
+        routes: syncBuilderRoute(state.routes, nextBuilder.hops, nextBuilder.schedules, nextBuilder.mode, {
+          // The builder was just edited: the draft row is the user's own draft.
+          appendDraft: true,
+        }),
       };
     }
     case 'builder/setMode': {
@@ -377,7 +459,10 @@ function reducer(state: AppState, action: StoreAction): AppState {
       return {
         ...state,
         builder: nextBuilder,
-        routes: syncBuilderRoute(state.routes, nextBuilder.hops, nextBuilder.schedules, nextBuilder.mode),
+        routes: syncBuilderRoute(state.routes, nextBuilder.hops, nextBuilder.schedules, nextBuilder.mode, {
+          // The builder was just edited: the draft row is the user's own draft.
+          appendDraft: true,
+        }),
       };
     }
     case 'builder/saveDraft': {
@@ -396,7 +481,11 @@ function reducer(state: AppState, action: StoreAction): AppState {
       // "Reset demo data": builder draft back to seed + exit demo mode.
       // The routes list, activity log, freelance projects, payroll
       // teams and vesting plans are sample data too — they reset to seed
-      // as well so the whole app is coherent again.
+      // as well so the whole app is coherent again. In real mode there
+      // is no sample data to restore: the wallet's workspace resets to
+      // EMPTY instead (seeding it would inject demo data into a real
+      // wallet's workspace).
+      if (!state.demoMode) return emptyAppState(state.settings);
       return {
         ...state,
         builder: seedBuilderState(),
@@ -784,9 +873,12 @@ function reducer(state: AppState, action: StoreAction): AppState {
       return { ...state, demoMode: action.demoMode };
     }
     case 'session/resetAll': {
-      // "Clear saved data": everything back to seed (Settings also removes
-      // the localStorage key; the persist effect then stores the seed state).
-      return seedAppState();
+      // "Clear saved data": everything back to seed in demo mode (the
+      // Settings handler also removes the localStorage key; the persist
+      // effect then stores the seed state). In real mode the wallet's
+      // workspace is erased to EMPTY — restoring seed data here would
+      // inject sample data into a real wallet's workspace.
+      return state.demoMode ? seedAppState() : emptyAppState(state.settings);
     }
     case 'settings/setTimezone': {
       const zone =
@@ -805,7 +897,12 @@ function reducer(state: AppState, action: StoreAction): AppState {
       return {
         ...state,
         settings: { timezone: { mode, zone, resolved } },
-        routes: syncBuilderRoute(state.routes, state.builder.hops, state.builder.schedules, state.builder.mode),
+        routes: syncBuilderRoute(state.routes, state.builder.hops, state.builder.schedules, state.builder.mode, {
+          // Only re-derive the draft row when the user already edited the
+          // builder; a fresh real-mode wallet must stay empty (the
+          // timezone effect alone must not conjure a route row).
+          appendDraft: state.builder.builderVersion > 0,
+        }),
       };
     }
     case 'settings/resolveTimezone': {
@@ -816,7 +913,12 @@ function reducer(state: AppState, action: StoreAction): AppState {
       return {
         ...state,
         settings: { timezone: { ...state.settings.timezone, resolved } },
-        routes: syncBuilderRoute(state.routes, state.builder.hops, state.builder.schedules, state.builder.mode),
+        routes: syncBuilderRoute(state.routes, state.builder.hops, state.builder.schedules, state.builder.mode, {
+          // Only re-derive the draft row when the user already edited the
+          // builder; a fresh real-mode wallet must stay empty (the
+          // timezone effect alone must not conjure a route row).
+          appendDraft: state.builder.builderVersion > 0,
+        }),
       };
     }
     default:
@@ -1143,16 +1245,47 @@ function reviveStoredState(parsed: AppState): AppState {
   };
 }
 
-const StoreContext = createContext<{ state: AppState; dispatch: React.Dispatch<StoreAction> } | null>(null);
+const StoreContext = createContext<{
+  state: AppState;
+  dispatch: React.Dispatch<StoreAction>;
+  /** The localStorage key this session reads/writes: the demo key in
+   * demo mode (and for logged-out visitors), or the connected wallet's
+   * own per-wallet key in real mode. */
+  storeKey: string;
+} | null>(null);
 
 export function StoreProvider({ children }: { children: React.ReactNode }) {
   const [state, dispatch] = useReducer(reducer, undefined, seedAppState);
-  const skipFirstWriteRef = useRef(false);
+  // The wallet address, when a wallet is connected. StoreProvider sits
+  // inside WalletProvider (root layout), so useWallet works here.
+  const { publicKey, connected } = useWallet();
+  const address = connected && publicKey ? publicKey.toBase58() : null;
+  // Which key this session reads/writes: the demo key in demo mode (and
+  // for logged-out visitors, who see the sample data), the connected
+  // wallet's own key in real mode — each wallet sees only its own data.
+  const activeKey = state.demoMode ? STORE_KEY : address ? storeKeyFor(address) : STORE_KEY;
+  const activeKeyRef = useRef(activeKey);
+  activeKeyRef.current = activeKey;
+  // The key whose record is currently in memory. The load effect sets it
+  // BEFORE dispatching, so a key switch never replays the old key's
+  // load, and the persist effect (below) can tell a fresh load from a
+  // user edit.
+  const loadedKeyRef = useRef<string | null>(null);
+  // Set by the load effect: the persist effect skips one run so the old
+  // context's data never overwrites the new key's record before the
+  // load lands.
+  const skipNextWriteRef = useRef(false);
 
-  // Hydrate after mount — never during render, so server and client agree.
+  // Load the active key's state whenever it changes (wallet connected /
+  // switched / disconnected, demo mode toggled). Never during render, so
+  // server and client agree. A wallet key with no record yet loads an
+  // EMPTY workspace — a brand-new wallet starts from zero.
   useEffect(() => {
+    if (loadedKeyRef.current === activeKey) return;
+    loadedKeyRef.current = activeKey;
+    skipNextWriteRef.current = true;
     try {
-      const raw = window.localStorage.getItem(STORE_KEY);
+      const raw = window.localStorage.getItem(activeKey);
       if (raw) {
         const parsed: unknown = JSON.parse(raw);
         if (isValidStoredState(parsed)) {
@@ -1172,12 +1305,23 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
               settings: { timezone: { ...stored.settings.timezone, resolved } },
             },
           });
+          return;
         }
+      }
+      // No valid record for this key: a fresh wallet gets an empty
+      // workspace (settings inherited so a manual timezone is not lost
+      // when a wallet first connects). A missing/corrupt demo key keeps
+      // the seed state already in memory.
+      if (activeKey !== STORE_KEY) {
+        dispatch({ type: 'hydrate', state: emptyAppState(state.settings) });
       }
     } catch {
       // Corrupted stored state: keep the seed state.
     }
-  }, []);
+    // The load intentionally keys on activeKey only: the settings it
+    // inherits come from the state at switch time.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeKey]);
 
   // Resolve the effective timezone whenever the stored preference
   // changes (fresh visit with no stored state, "Clear saved data",
@@ -1196,25 +1340,31 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tzMode, tzZone]);
 
-  // Persist every change. The first run is skipped so the seed state never
-  // overwrites stored state before hydration has had a chance to read it.
+  // Persist every change to the ACTIVE key (demo key, or the connected
+  // wallet's own key). The run right after a key switch is skipped so
+  // the old context's data never overwrites the new key's record before
+  // the load above lands.
   useEffect(() => {
-    if (!skipFirstWriteRef.current) {
-      skipFirstWriteRef.current = true;
+    if (skipNextWriteRef.current) {
+      skipNextWriteRef.current = false;
       return;
     }
     try {
-      window.localStorage.setItem(STORE_KEY, JSON.stringify(state));
+      window.localStorage.setItem(activeKeyRef.current, JSON.stringify(state));
     } catch {
       // Storage unavailable or full: the app keeps working in memory.
     }
   }, [state]);
 
-  const value = useMemo(() => ({ state, dispatch }), [state]);
+  const value = useMemo(() => ({ state, dispatch, storeKey: activeKey }), [state, activeKey]);
   return <StoreContext.Provider value={value}>{children}</StoreContext.Provider>;
 }
 
-export function useStore(): { state: AppState; dispatch: React.Dispatch<StoreAction> } {
+export function useStore(): {
+  state: AppState;
+  dispatch: React.Dispatch<StoreAction>;
+  storeKey: string;
+} {
   const ctx = useContext(StoreContext);
   if (!ctx) throw new Error('useStore must be used inside StoreProvider');
   return ctx;

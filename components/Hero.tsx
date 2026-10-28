@@ -3,9 +3,14 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useWallet } from '@solana/wallet-adapter-react';
-import { useWalletModal } from '@solana/wallet-adapter-react-ui';
 import { signAuthMessage } from '@/lib/client-auth';
-import { getSessionAuth, setSessionAuth } from '@/lib/session';
+import {
+  getSessionAuth,
+  setSessionAuth,
+  loadSessionMarker,
+  saveSessionMarker,
+  isValidSessionMarker,
+} from '@/lib/session';
 import { useStore } from '@/lib/store';
 import { PlayIcon } from './icons';
 
@@ -131,12 +136,17 @@ function RouteDiagram() {
   );
 }
 
-export default function Hero() {
+export default function Hero({
+  onHighlightConnect,
+}: {
+  /** Called when the Launch App guidance is shown/hidden so the landing
+   * page can pulse the header Connect Wallet button. */
+  onHighlightConnect?: (on: boolean) => void;
+}) {
   const router = useRouter();
   const { publicKey, signMessage, connected } = useWallet();
-  const { visible, setVisible } = useWalletModal();
   const { dispatch } = useStore();
-  const [launchState, setLaunchState] = useState<'idle' | 'waiting' | 'signing' | 'error'>('idle');
+  const [launchState, setLaunchState] = useState<'idle' | 'guide' | 'signing' | 'error'>('idle');
   const [launchError, setLaunchError] = useState<string | null>(null);
   const signingRef = useRef(false);
 
@@ -155,6 +165,10 @@ export default function Hero() {
     try {
       const auth = await signAuthMessage(address, signMessage);
       setSessionAuth(auth);
+      // Remember this wallet signed in (address + timestamp only — the
+      // signature itself stays in memory). After a reload the wallet
+      // reconnects and Launch App lets this wallet straight in.
+      saveSessionMarker(address);
       dispatch({ type: 'session/setDemoMode', demoMode: false });
       router.push('/dashboard');
     } catch (err) {
@@ -167,40 +181,44 @@ export default function Hero() {
     }
   };
 
+  const dismissGuide = () => {
+    setLaunchState('idle');
+    onHighlightConnect?.(false);
+  };
+
   const handleLaunchApp = () => {
     setLaunchError(null);
     if (connected && publicKey) {
-      // Already connected: if this wallet already has a session, enter
-      // directly; otherwise sign once, then enter.
+      // Already connected: if this wallet already has a session — the
+      // in-memory one, or a remembered sign-in from before a reload —
+      // enter directly; otherwise sign once, then enter.
+      const address = publicKey.toBase58();
       const existing = getSessionAuth();
-      if (existing && existing.address === publicKey.toBase58()) {
+      const remembered = isValidSessionMarker(loadSessionMarker(), address);
+      if ((existing && existing.address === address) || remembered) {
         dispatch({ type: 'session/setDemoMode', demoMode: false });
         router.push('/dashboard');
         return;
       }
-      void signAndEnter(publicKey.toBase58());
+      void signAndEnter(address);
       return;
     }
-    // No wallet yet: open the connect modal; the effect below signs once
-    // the wallet connects.
-    setLaunchState('waiting');
-    setVisible(true);
+    // No wallet yet: do NOT silently open the connect modal. Show the
+    // steps instead, and pulse the header Connect Wallet button so the
+    // user sees where to go first.
+    setLaunchState('guide');
+    onHighlightConnect?.(true);
   };
 
-  // After the modal connects the wallet, sign and enter.
+  // The user connected (via the header button) while the guidance was
+  // shown: stop highlighting and sign in, then enter.
   useEffect(() => {
-    if (launchState !== 'waiting') return;
+    if (launchState !== 'guide') return;
     if (!connected || !publicKey) return;
+    onHighlightConnect?.(false);
     void signAndEnter(publicKey.toBase58());
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [launchState, connected, publicKey]);
-
-  // Modal closed without connecting: back to idle.
-  useEffect(() => {
-    if (launchState === 'waiting' && !visible && !connected) {
-      setLaunchState('idle');
-    }
-  }, [launchState, visible, connected]);
 
   // Demo entry: no wallet required — the app opens with sample data and an
   // honest "Demo" badge. The demo video comes at the end of M4.
@@ -235,11 +253,7 @@ export default function Hero() {
             disabled={launchState === 'signing'}
             className="flex h-[52px] w-[170px] items-center justify-center rounded-btn bg-primary-gradient text-[16px] font-bold text-white shadow-sm transition-all duration-150 hover:brightness-110 active:scale-[0.98] disabled:opacity-70"
           >
-            {launchState === 'signing'
-              ? 'Signing in…'
-              : launchState === 'waiting'
-                ? 'Connect wallet…'
-                : 'Launch App'}
+            {launchState === 'signing' ? 'Signing in…' : 'Launch App'}
           </button>
 
           <button
@@ -256,6 +270,45 @@ export default function Hero() {
           <p role="alert" className="mt-3 max-w-[520px] text-[14px] leading-[20px] text-red-400">
             {launchError}
           </p>
+        )}
+
+        {/* Launch App guidance: shown instead of silently opening the
+            connect modal. The header Connect Wallet button pulses while
+            this is visible. Dismissible; Watch Demo is never blocked. */}
+        {launchState === 'guide' && (
+          <div
+            role="status"
+            aria-label="How to launch the app"
+            className="mt-4 max-w-[520px] rounded-2xl border border-border bg-white/[0.03] p-4"
+          >
+            <div className="flex items-start justify-between gap-3">
+              <h3 className="font-display text-[15px] font-bold text-white">
+                Connect your wallet first
+              </h3>
+              <button
+                type="button"
+                onClick={dismissGuide}
+                className="shrink-0 text-[13px] font-medium text-textMuted transition-colors hover:text-white"
+              >
+                Dismiss
+              </button>
+            </div>
+            <ol className="mt-2 flex flex-col gap-2 text-[14px] leading-[20px] text-textMuted">
+              <li>
+                <span className="font-bold text-white">1.</span> Connect your wallet with the{' '}
+                <span className="font-semibold text-white">Connect Wallet</span> button at the
+                top of this page — it is pulsing now.
+              </li>
+              <li>
+                <span className="font-bold text-white">2.</span> Come back here and click{' '}
+                <span className="font-semibold text-white">Launch App</span> — you will sign
+                once to prove you own the wallet, then the app opens.
+              </li>
+            </ol>
+            <p className="mt-2 text-[13px] leading-[18px] text-textMuted">
+              No funds move — the signature only proves you own the wallet.
+            </p>
+          </div>
         )}
       </div>
 

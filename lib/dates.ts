@@ -32,10 +32,36 @@ export function setEffectiveTimeZone(zone: string): void {
   if (isValidTimeZone(zone)) effectiveTimeZone = zone;
 }
 
-/** Parse a short date string like "Oct 28, 2026" (the format used across HopFlow). */
+/** Parse a short date string like "Oct 28, 2026" (the format used across HopFlow).
+ * A date-only value denotes a WALL DATE, not an instant — so it is
+ * resolved to NOON UTC, never to local midnight: `new Date(string)`
+ * parses "Oct 28, 2026" as midnight in the runtime's local zone, and
+ * the server (UTC) and the browser (e.g. Tehran) therefore turned the
+ * same string into different instants — formatShortDateTz then rendered
+ * Oct 27 on one side and Oct 28 on the other during hydration. Noon UTC
+ * keeps the calendar day identical when formatted in any realistic zone,
+ * and combineDateTime (which reads the local parts) still sees the
+ * intended date. */
+const SHORT_MONTHS: Record<string, number> = {
+  jan: 0, feb: 1, mar: 2, apr: 3, may: 4, jun: 5,
+  jul: 6, aug: 7, sep: 8, oct: 9, nov: 10, dec: 11,
+};
 export function parseShortDate(value: string): Date | null {
   const trimmed = value.trim();
   if (!trimmed) return null;
+  const m = trimmed.match(/^([A-Za-z]+)\s+(\d{1,2}),\s*(\d{4})$/);
+  if (m) {
+    const month = SHORT_MONTHS[m[1].slice(0, 3).toLowerCase()];
+    if (month === undefined) return null;
+    const day = Number(m[2]);
+    const year = Number(m[3]);
+    if (day < 1 || day > 31) return null;
+    return new Date(Date.UTC(year, month, day, 12, 0, 0));
+  }
+  const iso = trimmed.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (iso) {
+    return new Date(Date.UTC(Number(iso[1]), Number(iso[2]) - 1, Number(iso[3]), 12, 0, 0));
+  }
   const d = new Date(trimmed);
   return isNaN(d.getTime()) ? null : d;
 }

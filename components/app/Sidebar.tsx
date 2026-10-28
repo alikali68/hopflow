@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { useWallet } from '@solana/wallet-adapter-react';
 import { useWalletModal } from '@solana/wallet-adapter-react-ui';
 import { clearSessionAuth } from '@/lib/session';
@@ -34,6 +34,16 @@ function truncateAddress(address: string): string {
 export default function Sidebar({ active = 'Dashboard' }: { active?: string }) {
   const { publicKey, connected, disconnect } = useWallet();
   const { setVisible } = useWalletModal();
+  // Wallet card renders the connected state only after mount: with
+  // autoConnect on, the adapter can connect while React is still
+  // hydrating, and the address it renders then differs from the
+  // server's "Not connected" — a hydration mismatch. Until mounted the
+  // card shows the same "Not connected" branch the server rendered.
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+  const showConnected = mounted && connected && publicKey;
 
   const handleDisconnect = () => {
     // End the entry session too — a new wallet must sign again on entry.
@@ -82,7 +92,7 @@ export default function Sidebar({ active = 'Dashboard' }: { active?: string }) {
             connect; the old card showed a fake connected wallet on every
             page (audit S9). */}
         <div className="grad-border-soft mt-8 rounded-xl p-3">
-          {connected && publicKey ? (
+          {showConnected ? (
             <>
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">

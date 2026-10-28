@@ -1,3 +1,6 @@
+'use client';
+
+import React, { useState } from 'react';
 import Header from '@/components/Header';
 import Hero from '@/components/Hero';
 import StatsStrip from '@/components/StatsStrip';
@@ -6,6 +9,9 @@ import HowItWorks from '@/components/HowItWorks';
 import Footer from '@/components/Footer';
 
 export default function Page() {
+  // Pulses the header Connect Wallet button while the Launch App
+  // guidance is shown (Hero sets it when no wallet is connected).
+  const [highlightConnect, setHighlightConnect] = useState(false);
   return (
     <div className="min-h-screen bg-[#050508] p-3 md:p-5">
       <div className="relative overflow-hidden rounded-[28px] border border-border bg-bg">
@@ -38,9 +44,9 @@ export default function Page() {
         />
 
         <div className="relative z-10 mx-auto max-w-[1280px] px-5 md:px-10 lg:px-20">
-          <Header />
+          <Header highlightConnect={highlightConnect} />
           <main>
-            <Hero />
+            <Hero onHighlightConnect={setHighlightConnect} />
             <StatsStrip />
             <FlowCards />
             <HowItWorks />

@@ -5,7 +5,13 @@ import { NAV_LINKS } from './data';
 import { SettingsIcon } from './icons';
 import { WalletMultiButton } from '@solana/wallet-adapter-react-ui';
 
-export default function Header() {
+export default function Header({
+  highlightConnect,
+}: {
+  /** Pulses the wallet button while the Launch App guidance is shown, so
+   * the user sees where to connect first. */
+  highlightConnect?: boolean;
+}) {
   // Wallet button renders only after mount: the adapter renders a different
   // button on the client than on the server, which breaks hydration.
   const [mounted, setMounted] = useState(false);
@@ -56,9 +62,19 @@ export default function Header() {
         {/* Real wallet-adapter button: opens the connect modal when no wallet
             is connected, shows the truncated address once connected. Rendered
             only after mount (see above) — the placeholder keeps the layout
-            identical until then. */}
+            identical until then. When highlightConnect is on, the button
+            pulses with a green ring so the Launch App guidance can point
+            the user at it. */}
         {mounted ? (
-          <WalletMultiButton className="!h-11 sm:!h-12 !w-[150px] sm:!w-[190px] !rounded-btn !bg-primary-gradient !text-[14px] sm:!text-[16px] !font-bold !text-white !shadow-sm transition-all duration-150 hover:!brightness-110 active:!scale-[0.98]" />
+          <div
+            className={
+              highlightConnect
+                ? 'animate-pulse rounded-btn ring-2 ring-[#14F195] shadow-[0_0_24px_rgba(20,241,149,0.45)]'
+                : 'rounded-btn'
+            }
+          >
+            <WalletMultiButton className="!h-11 sm:!h-12 !w-[150px] sm:!w-[190px] !rounded-btn !bg-primary-gradient !text-[14px] sm:!text-[16px] !font-bold !text-white !shadow-sm transition-all duration-150 hover:!brightness-110 active:!scale-[0.98]" />
+          </div>
         ) : (
           <div className="flex h-11 w-[150px] items-center justify-center rounded-btn bg-gradient-to-r from-[#9945FF] to-[#14F195] text-[14px] font-bold text-white opacity-70 sm:h-12 sm:w-[190px] sm:text-[16px]">
             Select Wallet

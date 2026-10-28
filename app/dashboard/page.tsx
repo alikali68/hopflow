@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useMemo, useState } from 'react';
+import { useWallet } from '@solana/wallet-adapter-react';
 import AppShell from '@/components/app/AppShell';
 import Topbar from '@/components/app/Topbar';
 import StatCard from '@/components/dashboard/StatCard';
@@ -8,7 +9,7 @@ import RouteRow from '@/components/dashboard/RouteRow';
 import UpcomingList from '@/components/dashboard/UpcomingList';
 import ActivityFeed from '@/components/dashboard/ActivityFeed';
 import EmptyState from '@/components/dashboard/EmptyState';
-import { useRoutes, useFreelance, usePayroll, useVesting } from '@/lib/store';
+import { useStore, useRoutes, useFreelance, usePayroll, useVesting } from '@/lib/store';
 import { computeRouteStats, routeMatchesQuery } from '@/lib/routes';
 import { computeAppCounts } from '@/lib/counts';
 import { useNow } from '@/lib/use-now';
@@ -16,6 +17,12 @@ import { formatCountdown, formatShortDateTz, formatShortDateTimeTz, formatTimeTz
 import type { DashboardStat } from '@/components/data';
 
 export default function DashboardPage() {
+  const { state } = useStore();
+  const { connected } = useWallet();
+  // "Sample data" whenever the rows ARE samples: demo mode, or a
+  // logged-out visitor previewing the seed data. A connected wallet in
+  // real mode sees its own numbers, not samples.
+  const showSample = state.demoMode || !connected;
   const { routes } = useRoutes();
   const { projects } = useFreelance();
   const { teams } = usePayroll();
@@ -151,7 +158,9 @@ export default function DashboardPage() {
       <section aria-label="Modules">
         <div className="flex items-baseline gap-2.5 pb-4">
           <h2 className="font-display text-[18px] font-bold text-white">Modules</h2>
-          <span className="text-[12px] font-medium text-[#9A9AB0]">Sample data</span>
+          {showSample && (
+            <span className="text-[12px] font-medium text-[#9A9AB0]">Sample data</span>
+          )}
         </div>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
           {moduleItems.map((item) => (
@@ -165,7 +174,9 @@ export default function DashboardPage() {
           <div className="flex items-center justify-between pb-4">
             <div className="flex items-baseline gap-2.5">
               <h2 className="font-display text-[18px] font-bold text-white">My Routes</h2>
-              <span className="text-[12px] font-medium text-[#9A9AB0]">Sample data</span>
+              {showSample && (
+                <span className="text-[12px] font-medium text-[#9A9AB0]">Sample data</span>
+              )}
             </div>
             <a href="/routes" className="text-[13px] font-medium text-[#14F195] transition-colors hover:underline">
               View all →
