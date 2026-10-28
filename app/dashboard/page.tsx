@@ -8,14 +8,18 @@ import RouteRow from '@/components/dashboard/RouteRow';
 import UpcomingList from '@/components/dashboard/UpcomingList';
 import ActivityFeed from '@/components/dashboard/ActivityFeed';
 import EmptyState from '@/components/dashboard/EmptyState';
-import { useRoutes } from '@/lib/store';
+import { useRoutes, useFreelance, usePayroll, useVesting } from '@/lib/store';
 import { computeRouteStats, routeMatchesQuery } from '@/lib/routes';
+import { computeAppCounts } from '@/lib/counts';
 import { useNow } from '@/lib/use-now';
 import { formatCountdown, formatShortDateTz, formatShortDateTimeTz, formatTimeTz } from '@/lib/dates';
 import type { DashboardStat } from '@/components/data';
 
 export default function DashboardPage() {
   const { routes } = useRoutes();
+  const { projects } = useFreelance();
+  const { teams } = usePayroll();
+  const { plans } = useVesting();
   const now = useNow(30000);
   const [query, setQuery] = useState('');
 
@@ -23,6 +27,12 @@ export default function DashboardPage() {
   // headline always equals the data below it (audit S7).
   const statsNow = now ?? new Date();
   const stats = useMemo(() => computeRouteStats(routes, statsNow), [routes, statsNow]);
+  // Module counts come from the same shared helper the module list pages
+  // use, so a created project/team/plan counts here too (M4 counts wiring).
+  const counts = useMemo(
+    () => computeAppCounts(routes, projects, teams, plans, statsNow),
+    [routes, projects, teams, plans, statsNow],
+  );
   const filtered = useMemo(
     () => routes.filter((route) => routeMatchesQuery(route, query)),
     [routes, query],
@@ -48,6 +58,49 @@ export default function DashboardPage() {
     `${stats.completedRoutes} completed`,
   ];
   if (stats.pausedRoutes > 0) totalParts.push(`${stats.pausedRoutes} paused`);
+  // Non-USDC routes are counted separately, never folded into the USDC volume.
+  const nonUsdcParts: string[] = [];
+  if (stats.solRouteCount > 0)
+    nonUsdcParts.push(`${stats.solRouteCount} SOL draft route${stats.solRouteCount === 1 ? '' : 's'}`);
+  if (stats.flowRouteCount > 0)
+    nonUsdcParts.push(`${stats.flowRouteCount} FLOW route${stats.flowRouteCount === 1 ? '' : 's'}`);
+  const volumeSub =
+    nonUsdcParts.length > 0 ? `${nonUsdcParts.join(' + ')} tracked separately` : 'All routes in USDC';
+
+  const esc = counts.freelance;
+  const pay = counts.payroll;
+  const ves = counts.vesting;
+  const moduleItems: DashboardStat[] = [
+    {
+      id: 'escrow-projects',
+      label: 'ESCROW PROJECTS',
+      value: String(esc.totalProjects),
+      sub:
+        `${esc.activeCount} active · ${esc.inEscrowUsdc.toLocaleString('en-US')} USDC in escrow` +
+        (esc.inEscrowSol > 0 && esc.inEscrowUsdc > 0
+          ? ` · +${esc.inEscrowSol.toLocaleString('en-US')} SOL`
+          : ''),
+      iconType: 'lock',
+    },
+    {
+      id: 'payroll-teams',
+      label: 'PAYROLL TEAMS',
+      value: String(pay.totalTeams),
+      sub:
+        `${pay.activeTeams} active · ${pay.monthlyUsdc.toLocaleString('en-US')} USDC/mo` +
+        (pay.monthlySol > 0 && pay.monthlyUsdc > 0
+          ? ` · +${pay.monthlySol.toLocaleString('en-US')} SOL`
+          : ''),
+      iconType: 'users',
+    },
+    {
+      id: 'vesting-plans',
+      label: 'VESTING PLANS',
+      value: String(ves.totalPlans),
+      sub: `${ves.totalLocked.toLocaleString('en-US')} FLOW locked · ${ves.totalReleased.toLocaleString('en-US')} FLOW released`,
+      iconType: 'clock',
+    },
+  ];
 
   const statItems: DashboardStat[] = [
     {
@@ -68,10 +121,7 @@ export default function DashboardPage() {
       id: 'total-volume',
       label: 'TOTAL VOLUME',
       value: `${stats.totalVolumeUsdc.toLocaleString('en-US')} USDC`,
-      sub:
-        stats.solRouteCount > 0
-          ? `${stats.solRouteCount} SOL draft route tracked separately`
-          : 'All routes in USDC',
+      sub: volumeSub,
       iconType: 'dollar',
     },
     {
@@ -96,6 +146,18 @@ export default function DashboardPage() {
         {statItems.map((item) => (
           <StatCard key={item.id} item={item} />
         ))}
+      </section>
+
+      <section aria-label="Modules">
+        <div className="flex items-baseline gap-2.5 pb-4">
+          <h2 className="font-display text-[18px] font-bold text-white">Modules</h2>
+          <span className="text-[12px] font-medium text-[#9A9AB0]">Sample data</span>
+        </div>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+          {moduleItems.map((item) => (
+            <StatCard key={item.id} item={item} />
+          ))}
+        </div>
       </section>
 
       <div className="grid grid-cols-1 items-start gap-6 xl:grid-cols-[1fr_340px]">

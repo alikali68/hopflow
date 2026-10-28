@@ -878,7 +878,7 @@ function isValidStoredState(value: unknown): value is AppState {
         typeof o.name === 'string' &&
         (o.type === 'Escrow' || o.type === 'Payroll' || o.type === 'Vesting' || o.type === 'Custom') &&
         typeof o.amount === 'number' &&
-        (o.token === 'SOL' || o.token === 'USDC') &&
+        (o.token === 'SOL' || o.token === 'USDC' || o.token === 'FLOW') &&
         typeof o.hopsExecuted === 'number' &&
         typeof o.totalHops === 'number' &&
         (o.status === 'Active' || o.status === 'Paused' || o.status === 'Scheduled' || o.status === 'Completed') &&

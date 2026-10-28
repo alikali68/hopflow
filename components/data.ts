@@ -111,12 +111,20 @@ export interface DashboardStat {
   iconType: 'nodes' | 'pulse' | 'dollar' | 'clock' | 'lock' | 'alert' | 'users';
 }
 
-/** Shape of one seed row (the store converts these to StoreRoute). */
+/** Shape of one seed row (the store converts these to StoreRoute).
+ * The rows mirror real module items (audit S7, fixed in M4 counts wiring):
+ * route-1 is freelance ep-1 (Website Redesign: 2,500 USDC, 2 of 4
+ * milestones released), route-2 is payroll pt-1 (Core Dev Team: 4,200
+ * USDC/mo, 3 of 12 months paid), route-3 is vesting vp-1 (Core Team
+ * Vesting: 1,000,000 FLOW, 8 of 22 releases implied by the 380,000
+ * released snapshot — round(38% × 22)). The token is explicit so a FLOW
+ * route is never silently counted as USDC. */
 export interface DashboardRoute {
   id: string;
   name: string;
   type: string;
   amount: string;
+  token: 'SOL' | 'USDC' | 'FLOW';
   hopsExecuted: number;
   totalHops: number;
   status: 'Active' | 'Pending' | 'Completed';
@@ -124,8 +132,8 @@ export interface DashboardRoute {
 }
 
 export const ROUTES: DashboardRoute[] = [
-  { id: 'route-1', name: 'Website Redesign', type: 'Escrow', amount: '2,500 USDC', hopsExecuted: 3, totalHops: 5, status: 'Active', nextHop: 'Tomorrow, 09:00' },
-  { id: 'route-2', name: 'Marketing Campaign', type: 'Payroll', amount: '1,800 USDC', hopsExecuted: 2, totalHops: 5, status: 'Pending', nextHop: 'Oct 25, 12:00' },
-  { id: 'route-3', name: 'Content Creation', type: 'Vesting', amount: '950 USDC', hopsExecuted: 5, totalHops: 5, status: 'Completed', nextHop: '—' },
+  { id: 'route-1', name: 'Website Redesign', type: 'Escrow', amount: '2,500 USDC', token: 'USDC', hopsExecuted: 2, totalHops: 4, status: 'Active', nextHop: 'Tomorrow, 09:00' },
+  { id: 'route-2', name: 'Core Dev Team', type: 'Payroll', amount: '4,200 USDC', token: 'USDC', hopsExecuted: 3, totalHops: 12, status: 'Active', nextHop: 'Nov 1, 12:00' },
+  { id: 'route-3', name: 'Core Team Vesting', type: 'Vesting', amount: '1,000,000 FLOW', token: 'FLOW', hopsExecuted: 8, totalHops: 22, status: 'Active', nextHop: 'Feb 1, 2027' },
 ];
 

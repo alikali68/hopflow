@@ -1,40 +1,61 @@
-import React from 'react';
+'use client';
+
+import React, { useMemo } from 'react';
 import { type StatItem } from './data';
-import { seedStoreRoutes, computeRouteStats } from '@/lib/routes';
-import { seedFreelanceProjects } from '@/lib/freelance';
+import { useRoutes, useFreelance, usePayroll, useVesting } from '@/lib/store';
+import { computeAppCounts } from '@/lib/counts';
 import { TrendArrowIcon } from './icons';
 
-// Honest stats: derived from the app's own seed data, NOT live platform
-// numbers. The old strip claimed "1,240+ routes / 8.6M USDC / 3,900 users"
-// — nothing in the app counted those. These values come from the same
-// routes slice the dashboard computes from (seed state), so landing and
-// dashboard agree, and the strip is labelled as sample data below.
-// (Audit S7, resolved in step 3: the dashboard headline now equals the
-// listed rows, and the strip uses the same computation.)
-const routeStats = computeRouteStats(seedStoreRoutes(), new Date());
-
-const STATS: StatItem[] = [
-  {
-    value: String(routeStats.totalRoutes),
-    label: 'Routes created',
-    isGradient: true,
-    hasTrend: true,
-  },
-  {
-    value: routeStats.totalVolumeUsdc.toLocaleString('en-US'),
-    label: 'USDC routed',
-    isGradient: false,
-    hasTrend: false,
-  },
-  {
-    value: String(seedFreelanceProjects().length),
-    label: 'Escrow projects',
-    isGradient: false,
-    hasTrend: true,
-  },
-];
-
+// Honest stats: derived from the shared store — the same counts helper
+// the dashboard uses — NOT live platform numbers. The old strip claimed
+// "1,240+ routes / 8.6M USDC / 3,900 users" — nothing in the app counted
+// those. The underlying data is sample/seed data, so the caption below
+// says so. A project/team/plan created in the app counts here too
+// (M4 counts wiring); first paint shows the seed counts, the store
+// hydrates from localStorage afterwards, exactly like the dashboard.
 export default function StatsStrip() {
+  const { routes } = useRoutes();
+  const { projects } = useFreelance();
+  const { teams } = usePayroll();
+  const { plans } = useVesting();
+  const counts = useMemo(
+    () => computeAppCounts(routes, projects, teams, plans, new Date()),
+    [routes, projects, teams, plans],
+  );
+
+  const STATS: StatItem[] = [
+    {
+      value: String(counts.routes.totalRoutes),
+      label: 'Routes created',
+      isGradient: true,
+      hasTrend: true,
+    },
+    {
+      value: counts.routes.totalVolumeUsdc.toLocaleString('en-US'),
+      label: 'USDC routed',
+      isGradient: false,
+      hasTrend: false,
+    },
+    {
+      value: String(counts.freelance.totalProjects),
+      label: 'Escrow projects',
+      isGradient: false,
+      hasTrend: true,
+    },
+    {
+      value: String(counts.payroll.totalTeams),
+      label: 'Payroll teams',
+      isGradient: false,
+      hasTrend: true,
+    },
+    {
+      value: String(counts.vesting.totalPlans),
+      label: 'Vesting plans',
+      isGradient: false,
+      hasTrend: true,
+    },
+  ];
+
   return (
     <section
       className="mt-16 md:mt-24 w-full"

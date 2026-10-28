@@ -10,11 +10,13 @@
  * - The old dashboard headline said "12 routes / 48,290 USDC" while only
  *   3 rows were listed. The headline is now computed from the listed
  *   rows, so the numbers always agree.
- * - The seed rows come from the old ROUTES seed (components/data.ts).
- *   Their names still don't match any freelance project / payroll team /
- *   vesting plan 1:1 (audit S7) — those cross-module links only become
- *   real when the module slices land in later M4 steps. The rows are
- *   sample data and the dashboard says so.
+ * - The seed rows mirror real module items (M4 counts wiring): route-1
+ *   is freelance ep-1, route-2 is payroll pt-1, route-3 is vesting vp-1
+ *   (names, amounts, statuses and progress all match the module lists).
+ *   The old rows ("Marketing Campaign · 1,800 USDC", "Content Creation ·
+ *   950 USDC") matched no team or plan. Route volume counts USDC routes
+ *   only; the SOL builder draft and the FLOW vesting route are counted
+ *   separately (solRouteCount / flowRouteCount).
  * - The old seed gave route-2 a next hop of "Oct 25, 12:00" — already in
  *   the past on Oct 27. It is corrected forward to Nov 1, 12:00 (the
  *   payroll module's next payout date) — the seed instant is 08:30 UTC.
@@ -35,7 +37,7 @@ export interface StoreRoute {
   name: string;
   type: RouteType;
   amount: number;
-  token: 'SOL' | 'USDC';
+  token: 'SOL' | 'USDC' | 'FLOW';
   hopsExecuted: number;
   totalHops: number;
   status: RouteStatus;
@@ -55,12 +57,14 @@ export const BUILDER_ROUTE_ID = 'rt-1';
 /** Next-execution seed per old ROUTES row (ISO instants; authored as
  * Tehran wall time — route-1 "Tomorrow, 09:00" → Oct 28, 2026 09:00
  * Tehran = 05:30 UTC; route-2 "Oct 25, 12:00" was already past —
- * corrected to Nov 1, 12:00 Tehran = 08:30 UTC. Displays render these
- * instants in the user's timezone.)
- * route-3 is Completed → no next execution. */
+ * corrected to Nov 1, 12:00 Tehran = 08:30 UTC; route-3 is vesting
+ * vp-1's next release, Feb 1, 2027 10:00 Tehran = 06:30 UTC (its
+ * 3-month cliff ends then). Displays render these instants in the
+ * user's timezone.) */
 function seedNextExecution(id: string): string | null {
   if (id === 'route-1') return '2026-10-28T05:30:00.000Z';
   if (id === 'route-2') return '2026-11-01T08:30:00.000Z';
+  if (id === 'route-3') return '2027-02-01T06:30:00.000Z';
   return null;
 }
 
@@ -119,7 +123,7 @@ export function seedStoreRoutes(): StoreRoute[] {
     name: r.name,
     type: r.type as RouteType,
     amount: Number(r.amount.replace(/[^0-9.]/g, '')),
-    token: 'USDC' as const,
+    token: r.token,
     hopsExecuted: r.hopsExecuted,
     totalHops: r.totalHops,
     // The old seed called route-2 "Pending" — it is a scheduled route.
@@ -142,9 +146,10 @@ export interface RouteStats {
   pausedRoutes: number;
   scheduledRoutes: number;
   completedRoutes: number;
-  /** Sum of USDC route amounts only — SOL routes are counted separately. */
+  /** Sum of USDC route amounts only — SOL and FLOW routes are counted separately. */
   totalVolumeUsdc: number;
   solRouteCount: number;
+  flowRouteCount: number;
   /** Soonest upcoming execution among Active/Scheduled routes, if any. */
   nextExecution: { at: Date; route: StoreRoute } | null;
 }
@@ -167,6 +172,7 @@ export function computeRouteStats(routes: StoreRoute[], now: Date): RouteStats {
       .filter((r) => r.token === 'USDC')
       .reduce((sum, r) => sum + r.amount, 0),
     solRouteCount: routes.filter((r) => r.token === 'SOL').length,
+    flowRouteCount: routes.filter((r) => r.token === 'FLOW').length,
     nextExecution: upcoming[0] ?? null,
   };
 }
