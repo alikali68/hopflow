@@ -6,6 +6,8 @@ import Hero from '@/components/Hero';
 import StatsStrip from '@/components/StatsStrip';
 import FlowCards from '@/components/FlowCards';
 import HowItWorks from '@/components/HowItWorks';
+import WhyMultiHopper from '@/components/WhyMultiHopper';
+import ProofSection from '@/components/ProofSection';
 import Footer from '@/components/Footer';
 
 export default function Page() {
@@ -50,6 +52,8 @@ export default function Page() {
             <StatsStrip />
             <FlowCards />
             <HowItWorks />
+            <WhyMultiHopper />
+            <ProofSection />
           </main>
           <Footer />
         </div>

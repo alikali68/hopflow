@@ -211,12 +211,24 @@ export default function Hero({
   };
 
   // The user connected (via the header button) while the guidance was
-  // shown: stop highlighting and sign in, then enter.
+  // shown: stop highlighting and enter. A wallet that already has a
+  // session — in-memory, or a remembered sign-in from before a reload —
+  // enters directly, exactly like handleLaunchApp's connected branch;
+  // otherwise sign once, then enter. (Without this check, a click that
+  // lands before autoConnect finishes would re-sign needlessly.)
   useEffect(() => {
     if (launchState !== 'guide') return;
     if (!connected || !publicKey) return;
     onHighlightConnect?.(false);
-    void signAndEnter(publicKey.toBase58());
+    const address = publicKey.toBase58();
+    const existing = getSessionAuth();
+    const remembered = isValidSessionMarker(loadSessionMarker(), address);
+    if ((existing && existing.address === address) || remembered) {
+      dispatch({ type: 'session/setDemoMode', demoMode: false });
+      router.push('/dashboard');
+      return;
+    }
+    void signAndEnter(address);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [launchState, connected, publicKey]);
 
@@ -265,6 +277,16 @@ export default function Hero({
             <span>Watch Demo</span>
           </button>
         </div>
+
+        {/* Live proof, no wallet needed: the engine has already moved
+            real SOL on devnet (judge review W2). */}
+        <a
+          href="/proof"
+          className="mt-5 inline-flex max-w-[520px] items-center gap-1.5 text-[14px] font-semibold text-white transition-colors hover:text-[#14F195]"
+        >
+          See live proof — 4 transfers on Solana devnet
+          <span aria-hidden="true">→</span>
+        </a>
 
         {launchError && (
           <p role="alert" className="mt-3 max-w-[520px] text-[14px] leading-[20px] text-red-400">

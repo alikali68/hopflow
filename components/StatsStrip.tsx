@@ -106,9 +106,24 @@ export default function StatsStrip() {
           ))}
         </div>
       </div>
-      <p className="mt-3 text-center text-[12px] font-medium text-textMuted">
-        {isSample ? 'Sample data' : 'Your data'} · HopFlow beta · Solana Devnet
-      </p>
+      {/* The caption must be unmissable (judge review W3): the big
+          numbers are the demo workspace's own counts, not live platform
+          traction. A badge + explicit wording, not a quiet footnote. */}
+      {isSample ? (
+        <p className="mt-4 flex flex-wrap items-center justify-center gap-2 text-center text-[12px] font-medium text-textMuted">
+          <span className="rounded-full border border-border bg-white/[0.04] px-3 py-1 text-[11px] font-bold uppercase tracking-[0.08em] text-white">
+            Sample data
+          </span>
+          <span>
+            Demo workspace figures — not live platform totals · HopFlow beta
+            · Solana Devnet
+          </span>
+        </p>
+      ) : (
+        <p className="mt-3 text-center text-[12px] font-medium text-textMuted">
+          Your data · HopFlow beta · Solana Devnet
+        </p>
+      )}
     </section>
   );
 }

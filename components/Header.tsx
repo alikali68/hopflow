@@ -1,9 +1,36 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
+import { useWallet } from '@solana/wallet-adapter-react';
 import { NAV_LINKS } from './data';
-import { SettingsIcon } from './icons';
-import { WalletMultiButton } from '@solana/wallet-adapter-react-ui';
+import { SettingsIcon, WalletIcon } from './icons';
+import { WalletMultiButton, useWalletModal } from '@solana/wallet-adapter-react-ui';
+
+/** Compact connect button for small screens (judge review W5): the
+ * adapter's "Select Wallet" label wraps to two lines in 150px and
+ * crowds the settings gear at 390px. Below the sm breakpoint this
+ * button (icon + "Connect", 104px) opens the same connect modal via
+ * useWalletModal; when connected it shows the truncated address, like
+ * the adapter button. */
+function CompactWalletButton() {
+  const { connected, publicKey } = useWallet();
+  const { setVisible } = useWalletModal();
+  const label =
+    connected && publicKey
+      ? `${publicKey.toBase58().slice(0, 4)}…${publicKey.toBase58().slice(-4)}`
+      : 'Connect';
+  return (
+    <button
+      type="button"
+      onClick={() => setVisible(true)}
+      aria-label={connected ? `Wallet ${label}` : 'Connect Wallet'}
+      className="flex h-11 w-[104px] items-center justify-center gap-1.5 rounded-btn bg-primary-gradient text-[13px] font-bold text-white shadow-sm transition-all duration-150 hover:brightness-110 active:scale-[0.98]"
+    >
+      <WalletIcon size={16} />
+      <span className="truncate">{label}</span>
+    </button>
+  );
+}
 
 export default function Header({
   highlightConnect,
@@ -64,7 +91,9 @@ export default function Header({
             only after mount (see above) — the placeholder keeps the layout
             identical until then. When highlightConnect is on, the button
             pulses with a green ring so the Launch App guidance can point
-            the user at it. */}
+            the user at it. Below the sm breakpoint the compact button
+            renders instead (judge review W5): the adapter label wraps at
+            390px and crowds the settings gear. */}
         {mounted ? (
           <div
             className={
@@ -73,11 +102,17 @@ export default function Header({
                 : 'rounded-btn'
             }
           >
-            <WalletMultiButton className="!h-11 sm:!h-12 !w-[150px] sm:!w-[190px] !rounded-btn !bg-primary-gradient !text-[14px] sm:!text-[16px] !font-bold !text-white !shadow-sm transition-all duration-150 hover:!brightness-110 active:!scale-[0.98]" />
+            <div className="sm:hidden">
+              <CompactWalletButton />
+            </div>
+            <div className="hidden sm:block">
+              <WalletMultiButton className="!h-11 sm:!h-12 !w-[150px] sm:!w-[190px] !rounded-btn !bg-primary-gradient !text-[14px] sm:!text-[16px] !font-bold !text-white !shadow-sm transition-all duration-150 hover:!brightness-110 active:!scale-[0.98]" />
+            </div>
           </div>
         ) : (
-          <div className="flex h-11 w-[150px] items-center justify-center rounded-btn bg-gradient-to-r from-[#9945FF] to-[#14F195] text-[14px] font-bold text-white opacity-70 sm:h-12 sm:w-[190px] sm:text-[16px]">
-            Select Wallet
+          <div className="flex h-11 w-[104px] items-center justify-center rounded-btn bg-gradient-to-r from-[#9945FF] to-[#14F195] text-[13px] font-bold text-white opacity-70 sm:h-12 sm:w-[190px] sm:text-[16px]">
+            <span className="sm:hidden">Connect</span>
+            <span className="hidden sm:inline">Select Wallet</span>
           </div>
         )}
       </div>

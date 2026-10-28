@@ -41,6 +41,7 @@ import {
 import { computeExecutionTimes } from './route-time';
 import {
   seedStoreRoutes,
+  refreshStaleNextExecutions,
   seedActivity,
   syncBuilderRoute,
   type StoreRoute,
@@ -1172,9 +1173,14 @@ function reviveStoredState(parsed: AppState): AppState {
     },
     demoMode: typeof parsed.demoMode === 'boolean' ? parsed.demoMode : false,
     // Pre-step-3 states have no routes/activity — seed them (the validator
-    // already checked the shape when they are present).
+    // already checked the shape when they are present). Stored seed rows
+    // whose next execution went stale get pushed forward (relative seed
+    // dates, judge review W3) so an old browser never keeps showing
+    // "Overdue" after the fix ships.
     routes: Array.isArray(parsed.routes)
-      ? parsed.routes.map((r) => ({ ...r, wallets: [...(r.wallets ?? [])] }))
+      ? refreshStaleNextExecutions(
+          parsed.routes.map((r) => ({ ...r, wallets: [...(r.wallets ?? [])] })),
+        )
       : seedStoreRoutes(),
     activity: Array.isArray(parsed.activity)
       ? parsed.activity.map((a) => ({ ...a }))

@@ -54,18 +54,54 @@ export interface StoreRoute {
 /** The builder draft's dashboard row / tracking id (the demo route). */
 export const BUILDER_ROUTE_ID = 'rt-1';
 
-/** Next-execution seed per old ROUTES row (ISO instants; authored as
- * Tehran wall time — route-1 "Tomorrow, 09:00" → Oct 28, 2026 09:00
- * Tehran = 05:30 UTC; route-2 "Oct 25, 12:00" was already past —
- * corrected to Nov 1, 12:00 Tehran = 08:30 UTC; route-3 is vesting
- * vp-1's next release, Feb 1, 2027 10:00 Tehran = 06:30 UTC (its
- * 3-month cliff ends then). Displays render these instants in the
- * user's timezone.) */
-function seedNextExecution(id: string): string | null {
-  if (id === 'route-1') return '2026-10-28T05:30:00.000Z';
-  if (id === 'route-2') return '2026-11-01T08:30:00.000Z';
-  if (id === 'route-3') return '2027-02-01T06:30:00.000Z';
+/** Next-execution seed per old ROUTES row (ISO instants).
+ *
+ * RELATIVE SEED DATES (2026-10-28, judge review W3): the old hardcoded
+ * instants went stale the day they shipped — route-1's "Oct 28, 09:00
+ * Tehran" was already past, so the dashboard hero stat read "Overdue"
+ * on first load. Seed next-executions are now computed relative to
+ * "now" and can never open on "Overdue": route-1 next hop in ~2 days,
+ * route-2 in ~3 days, each at its original wall time (route-1 09:00
+ * Tehran = 05:30 UTC; route-2 12:00 Tehran = 08:30 UTC). Route-3 is
+ * vesting vp-1's next release, Feb 1, 2027 10:00 Tehran = 06:30 UTC
+ * (its 3-month cliff ends then) — that is cliff MATH, a fixed future
+ * date, and is intentionally NOT relative. Displays render these
+ * instants in the user's timezone. */
+function relativeNextExecution(id: string, now: Date): string | null {
+  const at = (days: number, utcHours: number, utcMinutes: number): string => {
+    const d = new Date(now.getTime() + days * 24 * 60 * 60 * 1000);
+    d.setUTCHours(utcHours, utcMinutes, 0, 0);
+    return d.toISOString();
+  };
+  if (id === 'route-1') return at(2, 5, 30);
+  if (id === 'route-2') return at(3, 8, 30);
   return null;
+}
+
+function seedNextExecution(id: string, now: Date = new Date()): string | null {
+  if (id === 'route-3') return '2027-02-01T06:30:00.000Z';
+  return relativeNextExecution(id, now);
+}
+
+/** Repair for stored states seeded before relative dates: a seed row
+ * (route-1 / route-2 only) whose next execution is already past — and
+ * still Active / Scheduled — gets pushed forward by the same relative
+ * rule, so a browser that stored the old hardcoded instant never keeps
+ * showing "Overdue" after this fix ships. Route-3 (cliff math),
+ * Completed routes, and user-created rows (the builder draft, whose
+ * schedule is the user's own) are never touched. Called on every store
+ * hydrate, so the rolling window holds for existing browsers too. */
+export function refreshStaleNextExecutions(
+  routes: StoreRoute[],
+  now: Date = new Date(),
+): StoreRoute[] {
+  return routes.map((r) => {
+    if (r.id !== 'route-1' && r.id !== 'route-2') return r;
+    if (!r.nextExecutionAt || r.status === 'Completed') return r;
+    if (new Date(r.nextExecutionAt).getTime() > now.getTime()) return r;
+    const next = relativeNextExecution(r.id, now);
+    return next ? { ...r, nextExecutionAt: next } : r;
+  });
 }
 
 /** The builder draft as a dashboard row — derived live from the builder

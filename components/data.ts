@@ -88,6 +88,7 @@ export const STEPS: StepItem[] = [
 ];
 
 export const FOOTER_LINKS: FooterLink[] = [
+  { label: 'Proof', href: '/proof' },
   { label: 'Privacy', href: '/privacy' },
   { label: 'Terms', href: '/terms' },
   { label: 'Docs', href: '/docs' },
