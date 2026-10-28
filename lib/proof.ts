@@ -52,7 +52,7 @@ export interface ProofTransfer {
   /** ISO instant hop 0 executed — only when on record (1509). */
   hop0ExecutedAt: string | null;
   hopTxSlot: number | null;
-  /** On-chain confirmed hop block slots (1490, 1496). */
+  /** On-chain confirmed hop block slots (1490, 1492, 1496). */
   confirmedSlots: number[];
   /** Hops still scheduled (1509). */
   nextHops: { at: string; label: string }[];
@@ -99,7 +99,7 @@ export const PROOF_TRANSFERS: ProofTransfer[] = [
     hopTxSignature: null,
     hop0ExecutedAt: null,
     hopTxSlot: null,
-    confirmedSlots: [],
+    confirmedSlots: [515364188, 515364399, 515364903],
     nextHops: [],
   },
   {

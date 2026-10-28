@@ -15,7 +15,7 @@ No wallet needed: see [/proof](http://localhost:3000/proof) in the app. Four tra
 | Transfer | Status | Amount | Delivered to Account 4 |
 |---|---|---|---|
 | [#1490](https://explorer.solana.com/address/Dke7ajmqt53gc8ijCkBmw4BVueMxDGeiPvbV2tZHsTba?cluster=devnet) | Completed Oct 26, 2026 | 0.1 SOL | 0.099502487 SOL — hops confirmed in blocks [515357900](https://explorer.solana.com/block/515357900?cluster=devnet), [515358068](https://explorer.solana.com/block/515358068?cluster=devnet), [515358572](https://explorer.solana.com/block/515358572?cluster=devnet) |
-| #1492 | Completed Oct 26, 2026 | 0.1 SOL | 0.099502487 SOL |
+| #1492 | Completed Oct 26, 2026 | 0.1 SOL | 0.099502487 SOL — hops confirmed in blocks [515364188](https://explorer.solana.com/block/515364188?cluster=devnet), [515364399](https://explorer.solana.com/block/515364399?cluster=devnet), [515364903](https://explorer.solana.com/block/515364903?cluster=devnet) |
 | #1496 | Completed Oct 26, 2026 | 0.1 SOL | 0.099502487 SOL — hop 0 in block [515385271](https://explorer.solana.com/block/515385271?cluster=devnet) |
 | [#1509](https://explorer.solana.com/tx/5RSz4yivNiy1G4rDBa1ZdcvvRdsVsJswqYX2TwWWGXFGo9kZSRh2LEUCDNCrqTsLFu7wmjZSGsj1YKxaw6GHNsPc?cluster=devnet) | In progress (hop 1 of 3) | 0.1 SOL | Expected 0.099502487 SOL on Nov 2, 2026 — hop 0 executed Oct 27, 2026 ([tx](https://explorer.solana.com/tx/5RSz4yivNiy1G4rDBa1ZdcvvRdsVsJswqYX2TwWWGXFGo9kZSRh2LEUCDNCrqTsLFu7wmjZSGsj1YKxaw6GHNsPc?cluster=devnet), slot 515,760,210) |
 
