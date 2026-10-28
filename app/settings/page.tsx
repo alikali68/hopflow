@@ -57,6 +57,13 @@ export default function SettingsPage() {
   const [resetDone, setResetDone] = useState(false);
   const [storedBytes, setStoredBytes] = useState<number | null>(null);
 
+  // Wallet button renders only after mount: the adapter renders a different
+  // button on the client than on the server, which breaks hydration.
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
   /** The module zone is set BEFORE dispatching, so the re-render that
    * follows already formats in the new zone (no stale-label flash). */
   const handleTimezoneChange = (value: string) => {
@@ -145,7 +152,13 @@ export default function SettingsPage() {
                 No wallet connected. Connect Phantom to enter the app and publish routes.
               </p>
               <div>
-                <WalletMultiButton className="!h-[44px] !rounded-xl !bg-gradient-to-r !from-[#9945FF] !to-[#14F195] !px-5 !font-display !text-[14px] !font-bold !text-white transition-all hover:!brightness-110" />
+                {mounted ? (
+                  <WalletMultiButton className="!h-[44px] !rounded-xl !bg-gradient-to-r !from-[#9945FF] !to-[#14F195] !px-5 !font-display !text-[14px] !font-bold !text-white transition-all hover:!brightness-110" />
+                ) : (
+                  <div className="flex h-[44px] w-fit items-center justify-center rounded-xl bg-gradient-to-r from-[#9945FF] to-[#14F195] px-5 font-display text-[14px] font-bold text-white opacity-70">
+                    Select Wallet
+                  </div>
+                )}
               </div>
             </>
           )}
@@ -201,12 +214,12 @@ export default function SettingsPage() {
               className="h-[44px] rounded-xl border border-border bg-white/[0.03] px-3 text-[14px] text-white outline-none focus:border-solanaPurple"
               aria-label="Timezone"
             >
-              <option value="auto">
+              <option value="auto" className="bg-[#1A1A2E] text-white">
                 Automatic
                 {detected ? ` — detected: ${formatZoneLabel(detected, new Date())}` : ' (detected from your browser)'}
               </option>
               {TIMEZONE_CHOICES.map((c) => (
-                <option key={c.zone} value={c.zone}>
+                <option key={c.zone} value={c.zone} className="bg-[#1A1A2E] text-white">
                   {c.label} — {formatZoneLabel(c.zone, new Date())}
                 </option>
               ))}

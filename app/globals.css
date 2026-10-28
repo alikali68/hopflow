@@ -3,6 +3,13 @@
 @tailwind utilities;
 
 @layer base {
+  :root {
+    /* Native controls (select dropdowns, date inputs) render in the app's
+     * dark theme. Without this, Chrome renders their popups white while the
+     * app's text is white — white-on-white, unreadable options. */
+    color-scheme: dark;
+  }
+
   html {
     scroll-behavior: smooth;
   }

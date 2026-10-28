@@ -185,6 +185,60 @@ export default function RouteTracker({ id }: RouteTrackerProps) {
     return <SampleRouteView route={storeRoute} />;
   }
 
+  // Unknown ids: neither the demo route, nor a store route, nor a numeric
+  // live-transfer id. Live transfer ids are numeric (1490, 1509, …), so a
+  // non-numeric id that matches nothing cannot be a real route — show an
+  // honest not-found state before the wallet gate instead of the generic
+  // connect prompt. (A numeric id that matches no live transfer still 404s
+  // honestly after auth, via the API fetch below.)
+  const isLiveId = /^\d+$/.test(id);
+  if (!isDemo && !isStoreRoute && !isLiveId) {
+    return (
+      <div className="flex flex-col gap-6">
+        <div>
+          <a
+            href="/routes"
+            className="inline-flex items-center gap-2 text-[13.5px] font-medium text-[#9A9AB0] transition-colors hover:text-white"
+          >
+            <ArrowLeftIcon size={15} />
+            <span>Back to routes</span>
+          </a>
+          <h1 className="mt-3 font-display text-[34px] font-bold tracking-tight text-white">
+            Route not found
+          </h1>
+          <p className="mt-2 text-[15px] text-[#9A9AB0]">
+            No route with the id &ldquo;{id}&rdquo; exists — it may have been mistyped,
+            or the route was never published.
+          </p>
+        </div>
+
+        <div className="grad-border flex flex-col items-start gap-4 rounded-2xl p-6">
+          <span className="icon-tile flex h-10 w-10 items-center justify-center rounded-xl text-[#F5C542]">
+            <AlertIcon size={20} />
+          </span>
+          <p className="max-w-[520px] text-[14px] leading-[22px] text-[#9A9AB0]">
+            Check the link and try again, or pick a route from the list. You can also
+            build a new route from the builder.
+          </p>
+          <div className="flex flex-wrap gap-3">
+            <a
+              href="/routes"
+              className="flex h-[44px] items-center justify-center rounded-xl bg-gradient-to-r from-[#9945FF] to-[#14F195] px-5 font-display text-[14px] font-bold text-white transition-all hover:brightness-110"
+            >
+              View all routes
+            </a>
+            <a
+              href="/builder"
+              className="flex h-[44px] items-center justify-center rounded-xl border border-borderStrong bg-transparent px-5 text-[14px] font-semibold text-white transition-colors hover:border-solanaPurple"
+            >
+              Build a new route
+            </a>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="flex flex-col gap-6">
       {/* Navigation and Top Header */}
