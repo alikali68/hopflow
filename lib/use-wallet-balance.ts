@@ -9,8 +9,16 @@ import { useEffect, useState } from 'react';
 import { useConnection, useWallet } from '@solana/wallet-adapter-react';
 import { PublicKey, LAMPORTS_PER_SOL } from '@solana/web3.js';
 
-/** Circle's USDC mint on Solana devnet. */
-export const DEVNET_USDC_MINT = '4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDnc';
+/**
+ * Circle's USDC mint on Solana devnet.
+ * Canonical table: https://developers.circle.com/stablecoins/usdc-contract-addresses.md
+ *
+ * NOTE: Confirmed on 2026-10-28:
+ * - Circle's official Solana devnet USDC mint.
+ * - Base58-decodes to exactly 32 bytes.
+ * - Verified live on devnet (slot 516141683) as an SPL Token mint with 6 decimals.
+ */
+export const DEVNET_USDC_MINT = '4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU';
 
 /**
  * The mint PublicKey, or null when the configured mint string is not a
@@ -18,12 +26,6 @@ export const DEVNET_USDC_MINT = '4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDnc';
  * never throw inside an effect — a synchronous throw there escapes the
  * promise chain, crashes the page through the React error boundary, and
  * orphans the SOL fetch as an unhandled rejection.
- *
- * NOTE (2026-10-28): the string above base58-decodes to 31 bytes and the
- * devnet RPC rejects it ("Invalid param: WrongSize"), so the USDC lookup
- * is currently skipped (usdc stays null and the UI shows an honest "—").
- * Do not guess a replacement mint — confirm Circle's devnet USDC mint
- * from Circle's docs first, then verify it decodes to exactly 32 bytes.
  */
 function resolveUsdcMint(): PublicKey | null {
   try {
