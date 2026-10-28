@@ -54,6 +54,16 @@ import {
   type FreelanceProject,
   type FreelanceDraft,
 } from './freelance';
+import {
+  seedPayrollTeams,
+  seedPayrollDraft,
+  buildTeamFromDraft,
+  resumeNextPayoutAt,
+  MAX_MEMBERS,
+  type PayrollTeam,
+  type PayrollDraft,
+} from './payroll';
+import { isValidSolanaAddress as isValidPayrollAddress } from '@/components/payroll/addMembersData';
 import { parseShortDate, setEffectiveTimeZone } from './dates';
 import { combineDateTime } from './route-time';
 import {
@@ -82,6 +92,18 @@ export interface FreelanceState {
   projects: FreelanceProject[];
   /** The in-progress create-wizard draft (all three steps share it). */
   draft: FreelanceDraft;
+}
+
+export interface PayrollState {
+  teams: PayrollTeam[];
+  /** The in-progress create-wizard draft (all four steps share it). */
+  draft: PayrollDraft;
+  /** Id of the team most recently created from the wizard (null when
+   * none). The createTeam action resets the draft to seed, so the
+   * review page's done view renders from this team — never from the
+   * reset draft (which would show seed values). Cleared on the first
+   * edit or save of a new draft (setDraft/saveDraft). */
+  lastCreatedTeamId: string | null;
 }
 
 export interface TimezoneSettings {
@@ -120,10 +142,15 @@ export interface AppState {
    * refund requests are recorded here (in-app only — there is no
    * on-chain escrow settlement in this beta). */
   freelance: FreelanceState;
-  /** User settings — timezone for now (payroll, vesting slices land in
-   * later M4 steps). */
+  /** Team payroll — the single source of truth for the list, detail
+   * and create pages. Pauses, member changes and creations are recorded
+   * here (in-app only — there is no on-chain payroll route in this
+   * beta). */
+  payroll: PayrollState;
+  /** User settings — timezone for now (vesting slice lands in a later
+   * M4 step). */
   settings: AppSettings;
-  // Later M4 steps add: payroll, vesting.
+  // Later M4 steps add: vesting.
 }
 
 export type StoreAction =
@@ -143,6 +170,13 @@ export type StoreAction =
   | { type: 'freelance/createProject' }
   | { type: 'freelance/claimRefund'; projectId: string }
   | { type: 'freelance/cancelProject'; projectId: string }
+  | { type: 'payroll/setDraft'; draft: PayrollDraft }
+  | { type: 'payroll/saveDraft' }
+  | { type: 'payroll/createTeam' }
+  | { type: 'payroll/addMember'; teamId: string; name: string; wallet: string; salary: number }
+  | { type: 'payroll/removeMember'; teamId: string; memberId: string }
+  | { type: 'payroll/undoRemoveMember'; teamId: string; memberId: string }
+  | { type: 'payroll/setTeamStatus'; teamId: string; status: 'Active' | 'Paused' }
   /** Timezone preference change (Settings). `resolved` is computed by
    * the caller (handler/effect) and the module zone is set BEFORE
    * dispatching, so the re-render already formats in the new zone. */
@@ -170,6 +204,14 @@ function seedFreelanceState(): FreelanceState {
   };
 }
 
+function seedPayrollState(): PayrollState {
+  return {
+    teams: seedPayrollTeams(),
+    draft: seedPayrollDraft(),
+    lastCreatedTeamId: null,
+  };
+}
+
 function seedSettings(): AppSettings {
   return { timezone: { mode: 'auto', zone: null, resolved: DEFAULT_TIME_ZONE } };
 }
@@ -182,6 +224,7 @@ function seedAppState(): AppState {
     routes: seedStoreRoutes(),
     activity: seedActivity(),
     freelance: seedFreelanceState(),
+    payroll: seedPayrollState(),
     settings: seedSettings(),
   };
 }
@@ -315,9 +358,9 @@ function reducer(state: AppState, action: StoreAction): AppState {
     }
     case 'builder/resetToSeed': {
       // "Reset demo data": builder draft back to seed + exit demo mode.
-      // The routes list, activity log and freelance projects are sample
-      // data too — they reset to seed as well so the whole app is
-      // coherent again.
+      // The routes list, activity log, freelance projects and payroll
+      // teams are sample data too — they reset to seed as well so the
+      // whole app is coherent again.
       return {
         ...state,
         builder: seedBuilderState(),
@@ -325,6 +368,7 @@ function reducer(state: AppState, action: StoreAction): AppState {
         routes: seedStoreRoutes(),
         activity: seedActivity(),
         freelance: seedFreelanceState(),
+        payroll: seedPayrollState(),
       };
     }
     case 'routes/setStatus': {
@@ -499,6 +543,148 @@ function reducer(state: AppState, action: StoreAction): AppState {
         activity: appendActivity(state.activity, `Refund requested · ${project.title}`, 'amber'),
       };
     }
+    case 'payroll/setDraft': {
+      const d = state.payroll.draft;
+      return {
+        ...state,
+        payroll: {
+          ...state.payroll,
+          draft: { ...action.draft, draftVersion: d.draftVersion + 1 },
+          // A new draft edit means the user is working on a new team —
+          // the done view of the previously created team must not linger.
+          lastCreatedTeamId: null,
+        },
+      };
+    }
+    case 'payroll/saveDraft': {
+      const d = state.payroll.draft;
+      return {
+        ...state,
+        payroll: {
+          ...state.payroll,
+          draft: { ...d, draftSavedAt: new Date().toISOString(), draftSavedVersion: d.draftVersion },
+          lastCreatedTeamId: null,
+        },
+      };
+    }
+    case 'payroll/createTeam': {
+      const team = buildTeamFromDraft(state.payroll.draft);
+      return {
+        ...state,
+        payroll: { teams: [team, ...state.payroll.teams], draft: seedPayrollDraft(), lastCreatedTeamId: team.id },
+        activity: appendActivity(state.activity, `Payroll team '${team.name}' created`, 'purple'),
+      };
+    }
+    case 'payroll/addMember': {
+      const team = state.payroll.teams.find((t) => t.id === action.teamId);
+      if (!team) return state;
+      if (team.members.filter((m) => m.status !== 'removed').length >= MAX_MEMBERS) return state;
+      if (!action.name.trim() || !isValidPayrollAddress(action.wallet.trim())) return state;
+      if (typeof action.salary !== 'number' || action.salary <= 0) return state;
+      const nowIso = new Date().toISOString();
+      const nextTeams = state.payroll.teams.map((t) =>
+        t.id === action.teamId
+          ? {
+              ...t,
+              members: [
+                ...t.members,
+                {
+                  id: `m-${Date.now().toString(36)}`,
+                  name: action.name.trim(),
+                  wallet: action.wallet.trim(),
+                  salary: action.salary,
+                  lastPaidAt: null,
+                  status: 'pending' as const,
+                  addedAt: nowIso,
+                },
+              ],
+            }
+          : t,
+      );
+      return {
+        ...state,
+        payroll: { ...state.payroll, teams: nextTeams },
+        activity: appendActivity(
+          state.activity,
+          `Member '${action.name.trim()}' added to ${team.name}`,
+          'green',
+        ),
+      };
+    }
+    case 'payroll/removeMember': {
+      const team = state.payroll.teams.find((t) => t.id === action.teamId);
+      const member = team?.members.find((m) => m.id === action.memberId);
+      if (!team || !member || member.status === 'removed') return state;
+      const nextTeams = state.payroll.teams.map((t) =>
+        t.id === action.teamId
+          ? {
+              ...t,
+              members: t.members.map((m) =>
+                m.id === action.memberId ? { ...m, status: 'removed' as const } : m,
+              ),
+            }
+          : t,
+      );
+      return {
+        ...state,
+        payroll: { ...state.payroll, teams: nextTeams },
+        activity: appendActivity(
+          state.activity,
+          `Member '${member.name}' removed from ${team.name}`,
+          'amber',
+        ),
+      };
+    }
+    case 'payroll/undoRemoveMember': {
+      const team = state.payroll.teams.find((t) => t.id === action.teamId);
+      const member = team?.members.find((m) => m.id === action.memberId);
+      if (!team || !member || member.status !== 'removed') return state;
+      const nextTeams = state.payroll.teams.map((t) =>
+        t.id === action.teamId
+          ? {
+              ...t,
+              members: t.members.map((m) =>
+                m.id === action.memberId ? { ...m, status: 'active' as const } : m,
+              ),
+            }
+          : t,
+      );
+      return {
+        ...state,
+        payroll: { ...state.payroll, teams: nextTeams },
+        activity: appendActivity(
+          state.activity,
+          `Member '${member.name}' restored to ${team.name}`,
+          'green',
+        ),
+      };
+    }
+    case 'payroll/setTeamStatus': {
+      const team = state.payroll.teams.find((t) => t.id === action.teamId);
+      if (!team || team.status === action.status) return state;
+      if (team.status === 'Draft') return state;
+      const now = new Date();
+      const nextTeams = state.payroll.teams.map((t) => {
+        if (t.id !== action.teamId) return t;
+        // Resuming re-derives the next payout: the stored date if it is
+        // still in the future, advanced by months if it slipped past,
+        // or the next occurrence of the payday day.
+        const nextPayoutAt =
+          action.status === 'Active' ? resumeNextPayoutAt(t, now).toISOString() : t.nextPayoutAt;
+        return { ...t, status: action.status, nextPayoutAt };
+      });
+      return {
+        ...state,
+        payroll: { ...state.payroll, teams: nextTeams },
+        activity: appendActivity(
+          state.activity,
+          action.status === 'Paused'
+            ? `Payroll '${team.name}' paused`
+            : `Payroll '${team.name}' resumed`,
+          action.status === 'Paused' ? 'amber' : 'green',
+        ),
+      };
+    }
     case 'session/setDemoMode': {
       if (state.demoMode === action.demoMode) return state;
       return { ...state, demoMode: action.demoMode };
@@ -669,6 +855,47 @@ function isValidStoredState(value: unknown): value is AppState {
       return false;
     }
   }
+  // payroll is optional (states saved before step 5 lack it) — but when
+  // present it must be well-shaped.
+  if (v.payroll !== undefined) {
+    const py = v.payroll as Record<string, unknown>;
+    if (!py || typeof py !== 'object' || !Array.isArray(py.teams) || !py.draft || typeof py.draft !== 'object') return false;
+    const teamsOk = (py.teams as unknown[]).every((t) => {
+      if (!t || typeof t !== 'object') return false;
+      const o = t as Record<string, unknown>;
+      return (
+        typeof o.id === 'string' &&
+        typeof o.name === 'string' &&
+        (o.token === 'USDC' || o.token === 'SOL') &&
+        (o.status === 'Active' || o.status === 'Paused' || o.status === 'Draft') &&
+        typeof o.payday === 'number' &&
+        (o.nextPayoutAt === null || typeof o.nextPayoutAt === 'string') &&
+        typeof o.monthsTotal === 'number' &&
+        typeof o.monthsPaid === 'number' &&
+        (o.duration === 'unlimited' || o.duration === 'fixed') &&
+        (o.paymentsTotal === null || typeof o.paymentsTotal === 'number') &&
+        typeof o.createdAt === 'string' &&
+        (o.vaultWalletShort === null || typeof o.vaultWalletShort === 'string') &&
+        Array.isArray(o.members) &&
+        Array.isArray(o.history)
+      );
+    });
+    if (!teamsOk) return false;
+    const d = py.draft as Record<string, unknown>;
+    if (
+      typeof d.teamName !== 'string' ||
+      (d.token !== 'USDC' && d.token !== 'SOL') ||
+      !Array.isArray(d.members) ||
+      typeof d.firstPayday !== 'string' ||
+      (d.duration !== 'unlimited' && d.duration !== 'fixed') ||
+      typeof d.payments !== 'number' ||
+      typeof d.draftVersion !== 'number' ||
+      typeof d.draftSavedVersion !== 'number' ||
+      (d.draftSavedAt !== null && typeof d.draftSavedAt !== 'string')
+    ) {
+      return false;
+    }
+  }
   // settings is optional (states saved before the timezone fix lack it)
   // — but when present it must be well-shaped.
   if (v.settings !== undefined) {
@@ -721,6 +948,24 @@ function reviveStoredState(parsed: AppState): AppState {
           },
         }
       : seedFreelanceState(),
+    // Pre-step-5 states have no payroll slice — seed it.
+    payroll: parsed.payroll
+      ? {
+          teams: parsed.payroll.teams.map((t) => ({
+            ...t,
+            members: t.members.map((m) => ({ ...m })),
+            history: t.history.map((h) => ({ ...h })),
+          })),
+          draft: {
+            ...parsed.payroll.draft,
+            members: parsed.payroll.draft.members.map((m) => ({ ...m })),
+          },
+          lastCreatedTeamId:
+            typeof parsed.payroll.lastCreatedTeamId === 'string'
+              ? parsed.payroll.lastCreatedTeamId
+              : null,
+        }
+      : seedPayrollState(),
     // Pre-timezone-fix states have no settings — seed them (auto mode,
     // resolved after mount by the resolve effect).
     settings: parsed.settings
@@ -840,6 +1085,17 @@ export function useFreelance(): {
 } {
   const { state, dispatch } = useStore();
   return { projects: state.freelance.projects, draft: state.freelance.draft, dispatch };
+}
+
+/** The payroll slice (team list, detail, create draft). */
+export function usePayroll(): {
+  teams: PayrollTeam[];
+  draft: PayrollDraft;
+  lastCreatedTeamId: string | null;
+  dispatch: React.Dispatch<StoreAction>;
+} {
+  const { state, dispatch } = useStore();
+  return { teams: state.payroll.teams, draft: state.payroll.draft, lastCreatedTeamId: state.payroll.lastCreatedTeamId, dispatch };
 }
 
 /** The routes slice (dashboard list, routes list page, tracking sample

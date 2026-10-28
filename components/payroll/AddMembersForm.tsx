@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React from 'react';
 import {
   PlusIcon,
   ChevronRightIcon,
@@ -8,53 +8,51 @@ import {
   CheckCircleIcon,
 } from '../icons';
 import {
-  SEED_MEMBERS,
   MAX_MEMBERS,
-  TeamMember,
-  isValidSolanaAddress,
-  formatUsdc,
-} from './addMembersData';
+  type PayrollDraftMember,
+  isValidDraftMember,
+  fmt0,
+} from '@/lib/payroll';
 import MemberRow from './MemberRow';
+import { usePayroll } from '@/lib/store';
 
 export default function AddMembersForm() {
-  const [members, setMembers] = useState<TeamMember[]>(SEED_MEMBERS);
-  const [nextId, setNextId] = useState(4);
+  const { draft, dispatch } = usePayroll();
+  const members = draft.members;
+  const token = draft.token;
+
+  const setDraft = (patch: Partial<typeof draft>) => {
+    dispatch({ type: 'payroll/setDraft', draft: { ...draft, ...patch } });
+  };
 
   const monthlyTotal = members.reduce(
-    (sum, m) => sum + (m.salaryUsdc || 0),
-    0
+    (sum, m) => sum + (m.salary || 0),
+    0,
   );
 
   const allValid =
-    members.length >= 1 &&
-    members.every(
-      (m) =>
-        m.name.trim().length > 0 &&
-        isValidSolanaAddress(m.wallet) &&
-        m.salaryUsdc > 0
-    );
+    members.length >= 1 && members.every(isValidDraftMember);
 
-  const updateMember = (id: string, patch: Partial<TeamMember>) => {
-    setMembers((prev) =>
-      prev.map((m) => (m.id === id ? { ...m, ...patch } : m))
-    );
+  const updateMember = (id: string, patch: Partial<PayrollDraftMember>) => {
+    setDraft({
+      members: members.map((m) => (m.id === id ? { ...m, ...patch } : m)),
+    });
   };
 
   const removeMember = (id: string) => {
     if (members.length <= 1) return;
-    setMembers((prev) => prev.filter((m) => m.id !== id));
+    setDraft({ members: members.filter((m) => m.id !== id) });
   };
 
   const addMember = () => {
     if (members.length >= MAX_MEMBERS) return;
-    const newMember: TeamMember = {
-      id: `m${nextId}`,
+    const newMember: PayrollDraftMember = {
+      id: `m-${Date.now().toString(36)}`,
       name: '',
       wallet: '',
-      salaryUsdc: 0,
+      salary: 0,
     };
-    setNextId((id) => id + 1);
-    setMembers((prev) => [...prev, newMember]);
+    setDraft({ members: [...members, newMember] });
   };
 
   const isAtMax = members.length >= MAX_MEMBERS;
@@ -70,6 +68,7 @@ export default function AddMembersForm() {
               key={member.id}
               index={index}
               member={member}
+              token={token}
               onChange={(patch) => updateMember(member.id, patch)}
               onRemove={() => removeMember(member.id)}
               canRemove={members.length > 1}
@@ -99,7 +98,7 @@ export default function AddMembersForm() {
             <div className="flex items-center gap-1.5 text-[13.5px] font-semibold text-[#14F195]">
               <CheckCircleIcon className="text-[#14F195]" size={16} />
               <span>
-                Ready — {members.length} member(s) · {formatUsdc(monthlyTotal)} USDC / month
+                Ready — {members.length} member(s) · {fmt0(monthlyTotal)} {token} / month
               </span>
             </div>
           ) : (

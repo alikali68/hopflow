@@ -5,7 +5,7 @@ import CreateTeamForm from '@/components/payroll/CreateTeamForm';
 import HowPayrollCard from '@/components/payroll/HowPayrollCard';
 import FeesCard from '@/components/freelance/FeesCard';
 import { ArrowLeftIcon } from '@/components/icons';
-import { PAYROLL_WIZARD_STEPS } from '@/components/payroll/createTeamData';
+import { PAYROLL_WIZARD_STEPS } from '@/lib/payroll';
 
 export default function CreateTeamPage() {
   return (

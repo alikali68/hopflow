@@ -1,9 +1,9 @@
 'use client';
 
 import React from 'react';
-import type { Team } from './payrollData';
+import type { TeamStatus } from '@/lib/payroll';
 
-export type PayrollFilter = 'All' | Team['status'];
+export type PayrollFilter = 'All' | TeamStatus;
 
 const OPTIONS: PayrollFilter[] = ['All', 'Active', 'Paused', 'Draft'];
 

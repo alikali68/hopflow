@@ -1,11 +1,13 @@
 import React from 'react';
 import { GripIcon, TrashIcon } from '../icons';
-import { TeamMember, isValidSolanaAddress } from './addMembersData';
+import type { PayrollDraftMember, PayrollToken } from '@/lib/payroll';
+import { isValidSolanaAddress } from './addMembersData';
 
 interface MemberRowProps {
-  member: TeamMember;
+  member: PayrollDraftMember;
   index: number;
-  onChange: (patch: Partial<TeamMember>) => void;
+  token: PayrollToken;
+  onChange: (patch: Partial<PayrollDraftMember>) => void;
   onRemove: () => void;
   canRemove: boolean;
 }
@@ -13,6 +15,7 @@ interface MemberRowProps {
 export default function MemberRow({
   member,
   index,
+  token,
   onChange,
   onRemove,
   canRemove,
@@ -23,7 +26,7 @@ export default function MemberRow({
   const handleSalaryChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const raw = e.target.value.replace(/[^0-9]/g, '');
     const num = Math.min(100000, Math.max(0, parseInt(raw || '0', 10)));
-    onChange({ salaryUsdc: num });
+    onChange({ salary: num });
   };
 
   return (
@@ -49,12 +52,12 @@ export default function MemberRow({
           <input
             type="text"
             inputMode="numeric"
-            value={member.salaryUsdc || ''}
+            value={member.salary || ''}
             onChange={handleSalaryChange}
             placeholder="0"
             className="w-[64px] bg-transparent text-center font-display font-bold text-white outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
           />
-          <span className="text-[13px] font-semibold text-white/90">USDC/mo</span>
+          <span className="text-[13px] font-semibold text-white/90">{token}/mo</span>
         </div>
       </div>
 

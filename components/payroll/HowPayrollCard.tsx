@@ -1,6 +1,6 @@
 import React from 'react';
 import { LockIcon } from '../icons';
-import { HOW_PAYROLL_STEPS } from './createTeamData';
+import { HOW_PAYROLL_STEPS } from '@/lib/payroll';
 
 export default function HowPayrollCard() {
   return (

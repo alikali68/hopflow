@@ -1,22 +1,33 @@
 'use client';
 
 import React, { useState } from 'react';
+import type { PayrollTeam } from '@/lib/payroll';
 import {
-  DASHBOARD_MEMBERS,
-  NEXT_PERIOD_DATE,
-  DashboardMember,
-  formatUsdc,
+  memberCountOf,
+  monthlyTotalOf,
   shortWallet,
-  initials,
-} from './teamDashboardData';
+  fmt0,
+  nextPayoutLabel,
+} from '@/lib/payroll';
+import { formatShortDateTz } from '@/lib/dates';
 import { isValidSolanaAddress } from './addMembersData';
+import { usePayroll } from '@/lib/store';
 
-type RowMember = DashboardMember & { status: 'active' | 'removed' | 'pending' };
+export function initials(name: string): string {
+  return name
+    .split(' ')
+    .map((w) => w[0])
+    .slice(0, 2)
+    .join('')
+    .toUpperCase();
+}
 
-export default function TeamMembersCard() {
-  const [members, setMembers] = useState<RowMember[]>(
-    DASHBOARD_MEMBERS.map((m) => ({ ...m, status: 'active' as const }))
-  );
+interface TeamMembersCardProps {
+  team: PayrollTeam;
+}
+
+export default function TeamMembersCard({ team }: TeamMembersCardProps) {
+  const { dispatch } = usePayroll();
   const [showAdd, setShowAdd] = useState(false);
   const [name, setName] = useState('');
   const [wallet, setWallet] = useState('');
@@ -37,7 +48,7 @@ export default function TeamMembersCard() {
     }
 
     if (!isValidSolanaAddress(wallet.trim())) {
-      newErrors.wallet = 'Invalid Solana address (32-44 base58 characters).';
+      newErrors.wallet = 'Invalid Solana address — must be a valid public key.';
     }
 
     const numSalary = Number(salary);
@@ -50,16 +61,7 @@ export default function TeamMembersCard() {
       return;
     }
 
-    const newMember: RowMember = {
-      id: `m-${Date.now()}`,
-      name: name.trim(),
-      wallet: wallet.trim(),
-      salaryUsdc: numSalary,
-      lastPaid: '—',
-      status: 'pending',
-    };
-
-    setMembers((prev) => [...prev, newMember]);
+    dispatch({ type: 'payroll/addMember', teamId: team.id, name: name.trim(), wallet: wallet.trim(), salary: numSalary });
     setName('');
     setWallet('');
     setSalary('');
@@ -68,16 +70,15 @@ export default function TeamMembersCard() {
   };
 
   const handleRemove = (id: string) => {
-    setMembers((prev) =>
-      prev.map((m) => (m.id === id ? { ...m, status: 'removed' as const } : m))
-    );
+    dispatch({ type: 'payroll/removeMember', teamId: team.id, memberId: id });
   };
 
   const handleUndo = (id: string) => {
-    setMembers((prev) =>
-      prev.map((m) => (m.id === id ? { ...m, status: 'active' as const } : m))
-    );
+    dispatch({ type: 'payroll/undoRemoveMember', teamId: team.id, memberId: id });
   };
+
+  const total = monthlyTotalOf(team);
+  const count = memberCountOf(team);
 
   return (
     <section className="grad-border rounded-2xl p-6" aria-label="Team members">
@@ -131,7 +132,7 @@ export default function TeamMembersCard() {
             <div>
               <input
                 type="number"
-                placeholder="USDC"
+                placeholder={team.token}
                 min={1}
                 value={salary}
                 onChange={(e) => setSalary(e.target.value)}
@@ -154,7 +155,7 @@ export default function TeamMembersCard() {
 
       {/* Member Rows */}
       <div className="mt-2 flex flex-col">
-        {members.map((member) => (
+        {team.members.map((member) => (
           <div
             key={member.id}
             className={`flex items-center gap-3 border-b border-white/[0.06] py-3.5 last:border-b-0 last:pb-0 ${
@@ -179,12 +180,18 @@ export default function TeamMembersCard() {
             {/* Salary & Status Details */}
             <div className="text-right">
               <span className="font-display text-[15px] font-bold text-white">
-                {formatUsdc(member.salaryUsdc)} USDC
+                {fmt0(member.salary)} {team.token}
               </span>
               <p className="text-[12px] text-[#9A9AB0]">
-                {member.status === 'active' && `Last paid ${member.lastPaid}`}
-                {member.status === 'pending' && `Starts ${NEXT_PERIOD_DATE}`}
-                {member.status === 'removed' && 'Last payout Nov 1, 2026'}
+                {member.status === 'active' &&
+                  (member.lastPaidAt
+                    ? `Last paid ${formatShortDateTz(new Date(member.lastPaidAt))}`
+                    : 'Not paid yet')}
+                {member.status === 'pending' && `Starts ${nextPayoutLabel(team)}`}
+                {member.status === 'removed' &&
+                  (member.lastPaidAt
+                    ? `Last payout ${formatShortDateTz(new Date(member.lastPaidAt))}`
+                    : 'Removed before first payout')}
               </p>
             </div>
 
@@ -234,7 +241,10 @@ export default function TeamMembersCard() {
       </div>
 
       <p className="mt-4 text-[12px] text-[#9A9AB0]">
-        Changes apply from the next period ({NEXT_PERIOD_DATE}).
+        Monthly total {fmt0(total)} {team.token} · {count} member{count === 1 ? '' : 's'}
+        {team.status === 'Paused'
+          ? ' — schedule paused, changes apply when resumed.'
+          : ` — changes apply from the next period (${nextPayoutLabel(team)}).`}
       </p>
     </section>
   );

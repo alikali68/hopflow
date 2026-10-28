@@ -1,23 +1,22 @@
 'use client';
 
-import React, { useState } from 'react';
+import React from 'react';
 import {
   ArrowLeftIcon,
   ChevronRightIcon,
   CheckCircleIcon,
 } from '../icons';
 import DatePicker from '../ui/DatePicker';
-import { formatLongDate } from '@/lib/dates';
+import { formatLongDate, parseShortDate } from '@/lib/dates';
 import {
   PAYDAY_OPTIONS,
-  DEFAULT_FIRST_PAYDAY,
-  DEFAULT_DURATION,
-  DEFAULT_PAYMENTS,
   MAX_PAYMENTS,
   paydayLabel,
-  firstPaydayDate,
-  DurationMode,
-} from './scheduleData';
+  durationLabel,
+  withPaydayDay,
+  type DurationMode,
+} from '@/lib/payroll';
+import { usePayroll } from '@/lib/store';
 
 function WhiteCheck({ size = 14 }: { size?: number }) {
   return (
@@ -58,20 +57,31 @@ function InfoIcon({ size = 16 }: { size?: number }) {
 }
 
 export default function ScheduleForm() {
-  const [firstPayday, setFirstPayday] = useState<Date>(DEFAULT_FIRST_PAYDAY);
-  const [duration, setDuration] = useState<DurationMode>(DEFAULT_DURATION);
-  const [payments, setPayments] = useState<number>(DEFAULT_PAYMENTS);
+  const { draft, dispatch } = usePayroll();
 
+  const setDraft = (patch: Partial<typeof draft>) => {
+    dispatch({ type: 'payroll/setDraft', draft: { ...draft, ...patch } });
+  };
+
+  const firstPayday = parseShortDate(draft.firstPayday) ?? new Date(2026, 10, 1);
+  const duration: DurationMode = draft.duration;
+  const payments = draft.payments;
   const payday = firstPayday.getDate();
 
   const handlePaydayClick = (day: number) => {
-    setFirstPayday(firstPaydayDate(day));
+    // The payday buttons change the day, never the month the user picked.
+    const next = withPaydayDay(firstPayday, day);
+    setDraft({ firstPayday: formatLongDate(next) });
+  };
+
+  const handleFirstPaydayChange = (date: Date) => {
+    setDraft({ firstPayday: formatLongDate(date) });
   };
 
   const handlePaymentsChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const raw = e.target.value.replace(/[^0-9]/g, '');
     const num = Math.min(MAX_PAYMENTS, Math.max(1, parseInt(raw || '1', 10)));
-    setPayments(num);
+    setDraft({ payments: num });
   };
 
   return (
@@ -113,7 +123,7 @@ export default function ScheduleForm() {
             </label>
             <DatePicker
               value={firstPayday}
-              onChange={setFirstPayday}
+              onChange={handleFirstPaydayChange}
               minDate={new Date(2026, 10, 1)}
               format={formatLongDate}
               placeholder="Pick the first payday"
@@ -132,7 +142,7 @@ export default function ScheduleForm() {
               {/* Unlimited Option */}
               <button
                 type="button"
-                onClick={() => setDuration('unlimited')}
+                onClick={() => setDraft({ duration: 'unlimited' })}
                 className={`relative rounded-2xl p-5 text-left transition-all ${
                   duration === 'unlimited'
                     ? 'grad-border'
@@ -155,7 +165,7 @@ export default function ScheduleForm() {
               {/* Fixed Number of Payments Option */}
               <button
                 type="button"
-                onClick={() => setDuration('fixed')}
+                onClick={() => setDraft({ duration: 'fixed' })}
                 className={`relative rounded-2xl p-5 text-left transition-all ${
                   duration === 'fixed'
                     ? 'grad-border'

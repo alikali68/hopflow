@@ -1,13 +1,25 @@
 import React from 'react';
 import {
-  TOTAL_TO_FUND,
-  PROTOCOL_FEE_USDC,
-  NETWORK_FEE_LABEL,
-  WALLET_BALANCE_USDC,
+  type PayrollDraft,
+  PROTOCOL_FEE_PCT,
+  fmt0,
   fmt2,
-} from './payrollReviewData';
+} from '@/lib/payroll';
 
-export default function PayrollFeeBreakdown() {
+interface PayrollFeeBreakdownProps {
+  draft: PayrollDraft;
+  /** The funding token's real wallet balance (null when unknown). */
+  balance: number | null;
+  balanceFailed: boolean;
+  walletConnected: boolean;
+}
+
+export default function PayrollFeeBreakdown({ draft, balance, balanceFailed, walletConnected }: PayrollFeeBreakdownProps) {
+  const monthlyTotal = draft.members.reduce((s, m) => s + (m.salary || 0), 0);
+  const fee = Math.round(monthlyTotal * PROTOCOL_FEE_PCT * 100) / 100;
+  const totalToFund = Math.round((monthlyTotal + fee) * 100) / 100;
+  const sufficient = balance !== null && balance >= totalToFund;
+
   return (
     <div className="flex flex-col">
       <h3 className="text-[14px] font-bold text-white">
@@ -21,7 +33,7 @@ export default function PayrollFeeBreakdown() {
             Protocol fee (0.5%)
           </span>
           <span className="text-[14px] font-semibold text-white">
-            {fmt2(PROTOCOL_FEE_USDC)} USDC
+            {fmt2(fee)} {draft.token}
           </span>
         </div>
 
@@ -30,7 +42,7 @@ export default function PayrollFeeBreakdown() {
             Network fee
           </span>
           <span className="text-[14px] font-semibold text-white">
-            {NETWORK_FEE_LABEL}
+            ≈ 0.001 SOL
           </span>
         </div>
       </div>
@@ -43,15 +55,28 @@ export default function PayrollFeeBreakdown() {
           Total to fund
         </span>
         <span className="font-display bg-gradient-to-r from-[#9945FF] to-[#14F195] bg-clip-text text-[22px] font-bold text-transparent">
-          {fmt2(TOTAL_TO_FUND)} USDC
+          {fmt2(totalToFund)} {draft.token}
         </span>
       </div>
 
       {/* Wallet Balance Sufficient Status */}
-      <div className="mt-2 flex items-center gap-2 text-[13px] font-semibold text-[#14F195]">
-        <span className="h-2 w-2 rounded-full bg-[#14F195] shadow-[0_0_8px_rgba(20,241,149,0.8)]" />
-        <span>
-          Wallet balance {WALLET_BALANCE_USDC.toLocaleString('en-US')} USDC — sufficient
+      <div className="mt-2 flex items-center gap-2 text-[13px] font-semibold">
+        <span
+          className={`h-2 w-2 rounded-full shadow-[0_0_8px_rgba(20,241,149,0.8)] ${
+            sufficient ? 'bg-[#14F195]' : 'bg-[#F5C542]'
+          }`}
+          aria-hidden="true"
+        />
+        <span className={sufficient ? 'text-[#14F195]' : 'text-[#F5C542]'}>
+          {!walletConnected
+            ? 'Connect your wallet to check your balance'
+            : balanceFailed
+              ? 'Wallet balance couldn’t be loaded — check again on create'
+              : balance !== null
+                ? sufficient
+                  ? `Wallet balance ${fmt0(balance)} ${draft.token} — sufficient`
+                  : `Wallet balance ${fmt0(balance)} ${draft.token} — insufficient for ${fmt0(totalToFund)} ${draft.token}`
+                : 'Loading wallet balance…'}
         </span>
       </div>
     </div>

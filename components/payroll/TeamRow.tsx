@@ -1,9 +1,9 @@
 import React from 'react';
-import type { Team } from './payrollData';
+import type { PayrollRow } from '@/lib/payroll';
 import { UsersIcon } from '../icons';
 
 interface TeamRowProps {
-  team: Team;
+  team: PayrollRow;
 }
 
 export default function TeamRow({ team }: TeamRowProps) {
@@ -33,16 +33,6 @@ export default function TeamRow({ team }: TeamRowProps) {
     }
   };
 
-  const getPayoutCaption = () => {
-    if (team.status === 'Active') {
-      return `Next payout ${team.nextPayout}`;
-    }
-    if (team.status === 'Paused') {
-      return 'Paused — payouts on hold';
-    }
-    return 'Draft — not scheduled yet';
-  };
-
   return (
     <div className="grad-border-soft flex gap-4 rounded-xl p-4 transition-colors hover:bg-white/[0.03]">
       {/* Icon Tile */}
@@ -54,17 +44,12 @@ export default function TeamRow({ team }: TeamRowProps) {
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-baseline gap-2">
           <h4 className="font-display text-[16px] font-bold text-white">
-            {/* B6: only Core Dev Team has a dashboard yet */}
-            {team.id === 'pt-1' ? (
-              <a href="/payroll/pt-1" className="transition-colors hover:text-[#B8B8FF] hover:underline">
-                {team.name}
-              </a>
-            ) : (
-              team.name
-            )}
+            <a href={`/payroll/${team.id}`} className="transition-colors hover:text-[#B8B8FF] hover:underline">
+              {team.name}
+            </a>
           </h4>
           <span className="text-[12px] text-[#9A9AB0]">
-            {team.members} members · {team.wallet}
+            {team.memberCount} members{team.vaultWalletShort ? ` · ${team.vaultWalletShort}` : ''}
           </span>
         </div>
 
@@ -94,7 +79,7 @@ export default function TeamRow({ team }: TeamRowProps) {
             {team.monthsPaid} of {team.monthsTotal} months paid
           </span>
           <span className="whitespace-nowrap text-[#B8B8C7]">
-            {getPayoutCaption()}
+            {team.nextPayoutCaption}
           </span>
         </div>
       </div>
@@ -102,7 +87,7 @@ export default function TeamRow({ team }: TeamRowProps) {
       {/* Right Column: Monthly Amount + Status */}
       <div className="flex shrink-0 flex-col items-end justify-between">
         <span className="font-display whitespace-nowrap text-[17px] font-bold text-white">
-          {team.monthlyAmount}
+          {team.monthlyLabel}
         </span>
         <div className="mt-2">{getStatusChip()}</div>
       </div>

@@ -39,6 +39,10 @@ export default function PayrollNextCard() {
           </div>
         ))}
       </div>
+
+      <p className="mt-5 border-t border-white/[0.06] pt-4 text-[12px] leading-relaxed text-[#5C5C72]">
+        Sample payroll — the team record is created in the app; no on-chain route is created in this beta.
+      </p>
     </div>
   );
 }

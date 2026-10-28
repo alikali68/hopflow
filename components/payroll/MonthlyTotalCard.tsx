@@ -1,13 +1,22 @@
 import React from 'react';
 import { WalletIcon } from '../icons';
 import {
-  MONTHLY_TOTAL,
-  SEED_MEMBERS,
-  FIRST_PAYDAY,
-  formatUsdc,
-} from './addMembersData';
+  type PayrollDraft,
+  fmt0,
+} from '@/lib/payroll';
+import { parseShortDate } from '@/lib/dates';
+import { combineDateTime } from '@/lib/route-time';
+import { formatShortDateTz } from '@/lib/dates';
 
-export default function MonthlyTotalCard() {
+interface MonthlyTotalCardProps {
+  draft: PayrollDraft;
+}
+
+export default function MonthlyTotalCard({ draft }: MonthlyTotalCardProps) {
+  const monthlyTotal = draft.members.reduce((s, m) => s + (m.salary || 0), 0);
+  const parsed = parseShortDate(draft.firstPayday);
+  const first = parsed ? combineDateTime(parsed, '10:00') : null;
+
   return (
     <div className="glass-panel rounded-2xl p-5">
       {/* Header */}
@@ -25,19 +34,19 @@ export default function MonthlyTotalCard() {
         <div className="flex items-center justify-between border-b border-white/[0.06] py-2.5 first:pt-0">
           <span className="text-[13.5px] text-[#9A9AB0]">Monthly total</span>
           <span className="font-display text-[14px] font-bold text-white">
-            {formatUsdc(MONTHLY_TOTAL)} USDC
+            {fmt0(monthlyTotal)} {draft.token}
           </span>
         </div>
         <div className="flex items-center justify-between border-b border-white/[0.06] py-2.5">
           <span className="text-[13.5px] text-[#9A9AB0]">Members</span>
           <span className="font-display text-[14px] font-bold text-white">
-            {SEED_MEMBERS.length}
+            {draft.members.length}
           </span>
         </div>
         <div className="flex items-center justify-between py-2.5 pb-0">
           <span className="text-[13.5px] text-[#9A9AB0]">First payday</span>
           <span className="font-display text-[14px] font-bold text-white">
-            {FIRST_PAYDAY}
+            {first ? formatShortDateTz(first) : '—'}
           </span>
         </div>
       </div>
