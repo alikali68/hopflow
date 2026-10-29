@@ -5,8 +5,11 @@ import { useConnection, useWallet } from '@solana/wallet-adapter-react';
 import { WalletMultiButton } from '@solana/wallet-adapter-react-ui';
 import { SOURCE_WALLET } from './previewData';
 import { validateHops } from './ValidationPanel';
-import { useBuilderRoute } from '@/lib/store';
+import { useBuilderRoute, useStore } from '@/lib/store';
 import { computeExecutionTimes, buildPublishRoute } from '@/lib/route-time';
+import { toLamports } from '@/lib/publish-flow';
+import { useHopFlowFee } from '@/components/publish/useHopFlowFee';
+import { formatLamportsSol, HOPFLOW_FEE_PCT } from '@/lib/fees';
 import { signAndSend } from '@/lib/signing';
 import { verifyPreparedBundle } from '@/lib/txverify';
 import {
@@ -60,6 +63,24 @@ export default function PublishPanel() {
   // The route being published is the one in the shared store — hops,
   // schedule, and mode as the user set them on D1/D2 (never the seed data).
   const { hops, schedules, mode, executions } = useBuilderRoute();
+  const { state: storeState } = useStore();
+  const demoMode = storeState.demoMode;
+
+  // HopFlow fee (0.1%) display amount: computed from the same route build
+  // runFlow uses. The amount is time-independent (only waits depend on
+  // `now`); an invalid route yields '0' so the panel never crashes at render.
+  // The charge itself uses the exact amountRaw sent at publish time, and
+  // runs only after publish confirms (see runFlow). Demo mode never charges.
+  const displayFeeRaw = (() => {
+    try {
+      const r = buildPublishRoute(hops, computeExecutionTimes(mode, hops, schedules, new Date()));
+      return toLamports(r.amountSol, 9);
+    } catch {
+      return '0';
+    }
+  })();
+  const { feeLamports, paidFeeLamports, isSol, feeState, feeSig, feeError, payFee, resetFee } =
+    useHopFlowFee({ amountRaw: displayFeeRaw, tokenMint: SOL_MINT, demoMode });
 
   const [mounted, setMounted] = useState(false);
   useEffect(() => {
@@ -81,6 +102,9 @@ export default function PublishPanel() {
   } | null>(null);
   const [keeperSignature, setKeeperSignature] = useState<string | null>(null);
   const [publishedId, setPublishedId] = useState<string | number | null>(null);
+  // Exact amountRaw of the publish just confirmed — the fee retry uses it so
+  // the charged fee always matches the published route, not the estimate.
+  const [publishedAmountRaw, setPublishedAmountRaw] = useState<string | null>(null);
 
   const activeWalletAddress = publicKey?.toBase58() || SOURCE_WALLET;
 
@@ -136,7 +160,9 @@ export default function PublishPanel() {
     setTransferId(null);
     setTransferRecord(null);
     setPublishedId(null);
+    setPublishedAmountRaw(null);
     setTxVerified(null);
+    resetFee();
     setSteps(freshSteps());
   };
 
@@ -511,6 +537,18 @@ export default function PublishPanel() {
           status: 'done',
           detail: `Status: ${data.status || 'processing'} — Keeper network active`,
         });
+
+        // HopFlow fee (0.1%): charged ONLY after the route is confirmed live,
+        // on the exact amountRaw just published. A rejected fee never blocks
+        // the published route (payFee reports unpaid, never throws).
+        try {
+          const publishAmountRaw = String(Math.round(Number(route.amountSol) * 1e9));
+          setPublishedAmountRaw(publishAmountRaw);
+          await payFee(publishAmountRaw);
+        } catch {
+          // Unreachable guard — payFee reports unpaid instead of throwing.
+        }
+
         setPublishedId(currentId);
       }
     } catch (err) {
@@ -537,6 +575,27 @@ export default function PublishPanel() {
         <p className="mt-1 text-[14px] text-[#9A9AB0]">
           Transfer #{String(publishedId)} is live on devnet. Keepers will execute each hop on schedule.
         </p>
+        {feeState === 'done' && (
+          <p className="mt-3 text-[13px] font-medium text-[#14F195]">
+            HopFlow fee paid — {formatLamportsSol(paidFeeLamports ?? feeLamports)} SOL
+            {feeSig ? ` · Sig: ${feeSig.slice(0, 8)}...` : ''}.
+          </p>
+        )}
+        {feeState === 'paying' && (
+          <p className="mt-3 text-[13px] font-medium text-white">Paying HopFlow fee…</p>
+        )}
+        {feeState === 'unpaid' && (
+          <div className="mt-4 flex flex-col items-center gap-2 rounded-xl border border-[#F5C542]/30 bg-[#F5C542]/10 p-3">
+            <p className="text-[13px] text-[#F5C542]">{feeError}</p>
+            <button
+              type="button"
+              onClick={() => void payFee(publishedAmountRaw ?? undefined)}
+              className="rounded-lg bg-white/10 px-4 py-2 text-[13px] font-semibold text-white transition hover:bg-white/15"
+            >
+              Pay HopFlow fee
+            </button>
+          </div>
+        )}
         <a
           href={`/routes/${publishedId}`}
           className="mt-5 inline-flex h-[48px] items-center gap-2 rounded-xl bg-gradient-to-r from-[#9945FF] to-[#14F195] px-6 text-[14px] font-bold text-white transition hover:brightness-110"
@@ -602,6 +661,29 @@ export default function PublishPanel() {
 
       {!hasStarted && (
         <>
+          <div className="glass-panel flex flex-col rounded-xl p-4">
+            <div className="flex items-center justify-between text-[13px]">
+              <span className="text-[#9A9AB0]">HopFlow fee ({HOPFLOW_FEE_PCT}%)</span>
+              <span className="font-display font-semibold text-white">
+                {demoMode
+                  ? `${formatLamportsSol(feeLamports)} SOL (demo — not charged)`
+                  : !isSol
+                  ? '— (SOL publishes only in beta)'
+                  : feeLamports > BigInt(0)
+                  ? `${formatLamportsSol(feeLamports)} SOL`
+                  : '—'}
+              </span>
+            </div>
+            <p className="mt-2 text-[12.5px] leading-relaxed text-[#9A9AB0]">
+              Charged once, after publish succeeds, as a separate transfer to a dedicated
+              HopFlow wallet. No fee if publish fails; if you later cancel the route, the
+              fee is not auto-refunded. See{' '}
+              <a href="/terms" className="underline hover:text-white">
+                Terms
+              </a>
+              .
+            </p>
+          </div>
           <button
             type="button"
             onClick={async () => {
@@ -706,6 +788,58 @@ export default function PublishPanel() {
                 )}
               </div>
             ))}
+
+            {/* HopFlow fee step — runs after confirm-final, never blocks publish */}
+            {(feeState === 'paying' || feeState === 'done' || feeState === 'unpaid') && (
+              <div className="grad-border-soft flex flex-col justify-between gap-2 rounded-xl p-3.5 sm:flex-row sm:items-center">
+                <div className="flex items-center gap-3">
+                  <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-white/5 font-display text-[12px] font-bold text-white">
+                    {feeState === 'done' ? (
+                      <CheckCircleIcon size={16} className="text-[#14F195]" />
+                    ) : feeState === 'paying' ? (
+                      <span className="h-3 w-3 animate-spin rounded-full border-2 border-[#14F195] border-t-transparent" />
+                    ) : (
+                      <AlertIcon size={16} className="text-[#F5C542]" />
+                    )}
+                  </span>
+                  <div className="flex flex-col">
+                    <span
+                      className={`text-[14px] font-medium ${
+                        feeState === 'done'
+                          ? 'text-[#3DFFB5]'
+                          : feeState === 'paying'
+                          ? 'text-white'
+                          : 'text-[#F5C542]'
+                      }`}
+                    >
+                      HopFlow fee ({HOPFLOW_FEE_PCT}%)
+                    </span>
+                    {feeState === 'done' && (
+                      <span className="font-mono text-[12px] text-[#B8B8C7]">
+                        Paid — {formatLamportsSol(paidFeeLamports ?? feeLamports)} SOL
+                        {feeSig ? ` · Sig: ${feeSig.slice(0, 8)}...` : ''}
+                      </span>
+                    )}
+                    {feeState === 'paying' && (
+                      <span className="text-[12px] text-[#B8B8C7]">Waiting for your signature…</span>
+                    )}
+                    {feeState === 'unpaid' && feeError && (
+                      <span className="mt-0.5 text-[12px] font-medium text-[#F5C542]">{feeError}</span>
+                    )}
+                  </div>
+                </div>
+                {feeState === 'unpaid' && (
+                  <button
+                    type="button"
+                    onClick={() => void payFee(publishedAmountRaw ?? undefined)}
+                    disabled={flowRunning}
+                    className="rounded-lg bg-white/10 px-3 py-1 text-[12px] font-semibold text-white transition hover:bg-white/15"
+                  >
+                    Pay HopFlow fee
+                  </button>
+                )}
+              </div>
+            )}
           </div>
         </div>
       )}

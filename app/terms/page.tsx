@@ -1,11 +1,12 @@
 import React from 'react';
 import InfoShell, { InfoCard, InfoH2, InfoList, InfoP } from '@/components/InfoShell';
+import { HOPFLOW_FEE_WALLET, HOPFLOW_FEE_PCT } from '@/lib/fees';
 
 export default function TermsPage() {
   return (
     <InfoShell
       title="Terms of Use"
-      subtitle="HopFlow is beta software for Solana Devnet. Please read this before connecting a wallet or publishing a route. Last updated: October 27, 2026."
+      subtitle="HopFlow is beta software for Solana Devnet. Please read this before connecting a wallet or publishing a route. Last updated: October 30, 2026."
     >
       <InfoCard>
         <InfoH2>Beta software, devnet only</InfoH2>
@@ -39,6 +40,17 @@ export default function TermsPage() {
             'Once published, a route cannot be cancelled from HopFlow. Recovery of stuck funds depends on the MultiHopper protocol’s rescue mechanism — HopFlow does not promise refunds.',
             'Execution timing depends on the Solana network and the protocol keeper; HopFlow does not guarantee an exact execution second.',
             'The protocol charges a small fee on published routes (0.5% in the current devnet configuration). The preview shows the fee before you sign.',
+          ]}
+        />
+
+        <InfoH2>HopFlow fee</InfoH2>
+        <InfoList
+          items={[
+            `HopFlow charges its own fee of ${HOPFLOW_FEE_PCT}% on SOL publishes, on top of the protocol fee. The preview shows the fee before you sign. The fee also applies to devnet publishes in this beta, so the flow can be tested with play money.`,
+            'The fee is a separate transfer, paid after the publish succeeds, to a dedicated HopFlow wallet — it is never taken out of the route amount, and HopFlow never holds route funds.',
+            <>Fee wallet (public key, receive-only): <span className="break-all font-mono text-[13px] text-white">{HOPFLOW_FEE_WALLET}</span></>,
+            'No fee is charged if the publish itself fails. If you later cancel or refund a published route, the fee is not auto-refunded: it pays for the publishing and tracking service already rendered.',
+            'The beta fee rate may change, but only for publishes made after the change — never retroactively.',
           ]}
         />
 

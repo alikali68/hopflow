@@ -32,6 +32,7 @@ import {
 } from '@/lib/publish-flow';
 import TransitHopPicker from '@/components/publish/TransitHopPicker';
 import ModulePublishFlow from '@/components/publish/ModulePublishFlow';
+import { hopFlowFeeLamports } from '@/lib/fees';
 import { NodesIcon, LockIcon } from '@/components/icons';
 
 interface PublishVestingPanelProps {
@@ -347,9 +348,15 @@ export default function PublishVestingPanel({ plan }: PublishVestingPanelProps) 
               let disabledReason: string | null = transitErr;
               if (!disabledReason && selectedRow.amount > BETA_MAX_PUBLISH_SOL) {
                 disabledReason = `Release amount exceeds the ${BETA_MAX_PUBLISH_SOL} SOL beta cap per event.`;
-              } else if (!disabledReason && sol !== null && sol < selectedRow.amount + selectedRow.amount * 0.005 + 0.006) {
-                const totalReq = (selectedRow.amount + selectedRow.amount * 0.005 + 0.006).toFixed(3);
-                disabledReason = `Wallet balance ${sol.toFixed(3)} SOL is below the ${totalReq} SOL needed (release + ~0.5% fee + dispersion rent).`;
+              } else if (!disabledReason && sol !== null) {
+                const hopFeeSol =
+                  selectedRow.amount > 0
+                    ? Number(hopFlowFeeLamports(toLamports(selectedRow.amount, 9))) / 1e9
+                    : 0;
+                const totalReqNum = selectedRow.amount + selectedRow.amount * 0.005 + hopFeeSol + 0.006;
+                if (sol < totalReqNum) {
+                  disabledReason = `Wallet balance ${sol.toFixed(3)} SOL is below the ${totalReqNum.toFixed(3)} SOL needed (release + ~0.5% fee + HopFlow fee 0.1% + dispersion rent).`;
+                }
               }
 
               const job: PublishJob = {
@@ -423,6 +430,7 @@ export default function PublishVestingPanel({ plan }: PublishVestingPanelProps) 
                     paysAtLabel={`Pays ${formatDateTimeTz(rowDate)} (${formatDateTimeUtc(rowDate)})`}
                     warning={warning}
                     disabledReason={disabledReason}
+                    demoMode={state.demoMode}
                     onPublished={(id) => {
                       dispatch({
                         type: 'vesting/markReleasePublished',

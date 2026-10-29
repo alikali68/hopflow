@@ -22,6 +22,7 @@ import {
 } from '@/lib/publish-flow';
 import TransitHopPicker from '@/components/publish/TransitHopPicker';
 import ModulePublishFlow from '@/components/publish/ModulePublishFlow';
+import { hopFlowFeeLamports } from '@/lib/fees';
 import { NodesIcon, LockIcon } from '@/components/icons';
 
 interface PublishPayrollPanelProps {
@@ -95,9 +96,13 @@ export default function PublishPayrollPanel({ team }: PublishPayrollPanelProps) 
     } — fix before publishing.`;
   } else if (total > BETA_MAX_PUBLISH_SOL) {
     disabledReason = `Total payout exceeds the ${BETA_MAX_PUBLISH_SOL} SOL beta cap.`;
-  } else if (sol !== null && sol < total + total * 0.005 + 0.006) {
-    const totalRequired = (total + total * 0.005 + 0.006).toFixed(3);
-    disabledReason = `Wallet balance ${sol.toFixed(3)} SOL is below the ${totalRequired} SOL needed (payroll + ~0.5% fee + dispersion rent).`;
+  } else if (sol !== null) {
+    const hopFeeSol =
+      total > 0 ? Number(hopFlowFeeLamports(toLamports(total, 9))) / 1e9 : 0;
+    const totalRequiredNum = total + total * 0.005 + hopFeeSol + 0.006;
+    if (sol < totalRequiredNum) {
+      disabledReason = `Wallet balance ${sol.toFixed(3)} SOL is below the ${totalRequiredNum.toFixed(3)} SOL needed (payroll + ~0.5% fee + HopFlow fee 0.1% + dispersion rent).`;
+    }
   }
 
   // Built only when a publishable amount exists: toLamports throws on 0,
@@ -342,6 +347,7 @@ export default function PublishPayrollPanel({ team }: PublishPayrollPanelProps) 
                   paysAtLabel={payoutAt ? `Pays ${formatDateTimeTz(payoutAt)} (${formatDateTimeUtc(payoutAt)})` : 'Pays at scheduled payday'}
                   warning={warning}
                   disabledReason={disabledReason}
+                  demoMode={state.demoMode}
                   onPublished={(id) => {
                     dispatch({
                       type: 'payroll/markCyclePublished',

@@ -19,6 +19,7 @@ import {
 } from '@/lib/publish-flow';
 import TransitHopPicker from '@/components/publish/TransitHopPicker';
 import ModulePublishFlow from '@/components/publish/ModulePublishFlow';
+import { hopFlowFeeLamports } from '@/lib/fees';
 import { NodesIcon } from '@/components/icons';
 
 interface PublishEscrowPanelProps {
@@ -204,9 +205,15 @@ export default function PublishEscrowPanel({ project }: PublishEscrowPanelProps)
                 disabledReason = 'Freelancer wallet is not a valid Solana address.';
               } else if (!disabledReason && selectedMilestone.amount > BETA_MAX_PUBLISH_SOL) {
                 disabledReason = `Above the ${BETA_MAX_PUBLISH_SOL} SOL beta cap.`;
-              } else if (!disabledReason && sol !== null && sol < selectedMilestone.amount * 1.005 + 0.004) {
-                const totalReq = (selectedMilestone.amount * 1.005 + 0.004).toFixed(3);
-                disabledReason = `Wallet balance ${sol.toFixed(3)} SOL is below the ${totalReq} SOL needed (milestone + ~0.5% fee + rent).`;
+              } else if (!disabledReason && sol !== null) {
+                const hopFeeSol =
+                  selectedMilestone.amount > 0
+                    ? Number(hopFlowFeeLamports(toLamports(selectedMilestone.amount, 9))) / 1e9
+                    : 0;
+                const totalReqNum = selectedMilestone.amount * 1.005 + hopFeeSol + 0.004;
+                if (sol < totalReqNum) {
+                  disabledReason = `Wallet balance ${sol.toFixed(3)} SOL is below the ${totalReqNum.toFixed(3)} SOL needed (milestone + ~0.5% fee + HopFlow fee 0.1% + rent).`;
+                }
               }
 
               const job = {
@@ -239,6 +246,7 @@ export default function PublishEscrowPanel({ project }: PublishEscrowPanelProps)
                     paysAtLabel={`Pays ${formatDateTimeTz(due)} (${formatDateTimeUtc(due)})`}
                     warning={warning}
                     disabledReason={disabledReason}
+                    demoMode={state.demoMode}
                     onPublished={(id) => {
                       dispatch({
                         type: 'freelance/markMilestonePublished',

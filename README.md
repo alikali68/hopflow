@@ -70,6 +70,12 @@ Click **Watch Demo** on the landing page to explore the whole app with sample da
 
 با دکمه‌ی **Watch Demo** در صفحه‌ی اصلی، کل اپ را با داده‌ی نمونه ببینید — بدون نیاز به ولت، بدون اینکه چیزی منتشر شود؛ همه‌ی صفحه‌های دمو برچسب **Demo** دارند. در حالت واقعی، فضای کاری هر ولت خالی شروع می‌شود و تا وقتی وارد نشده‌اید چیزی نمایش داده نمی‌شود.
 
+## HopFlow Fee | کارمزد هاپ‌فلو
+
+HopFlow charges its own fee of **0.1%** on SOL publishes, on top of the MultiHopper protocol fee (0.5%). The fee is a **separate SOL transfer** to a dedicated HopFlow wallet, paid **after the publish succeeds** — it is never taken out of the route amount, and HopFlow never holds route funds. The preview shows the fee before you sign. No fee is charged if the publish itself fails; if you later cancel or refund a published route, the fee is not auto-refunded. Demo mode never charges a fee. Fee wallet (public key): `HKKi3nYPnR6eCH4J2W6odfz3bsx1RL4KiPGKsscqJJ2o`.
+
+هاپ‌فلو روی انتشارهای SOL، جدا از کارمزد پروتکل مولتی‌هاپر (۰٫۵٪)، کارمزد خودش را به میزان **۰٫۱٪** می‌گیرد. این کارمزد یک **تراکنش جداگانه‌ی SOL** به ولت اختصاصی هاپ‌فلو است که **بعد از موفقیت انتشار** پرداخت می‌شود — هرگز از مبلغ مسیر کم نمی‌شود و هاپ‌فلو هرگز پول مسیر را نگه نمی‌دارد. پیش‌نمایش قبل از امضا کارمزد را نشان می‌دهد. اگر خود انتشار ناموفق باشد، کارمزدی گرفته نمی‌شود؛ اگر بعداً مسیر را لغو یا برگشت بزنید، کارمزد به‌صورت خودکار برنمی‌گردد. حالت دمو هرگز کارمزد نمی‌گیرد. ولت کارمزد (کلید عمومی): `HKKi3nYPnR6eCH4J2W6odfz3bsx1RL4KiPGKsscqJJ2o`.
+
 ## Screenshots | تصاویر
 
 ![Landing](docs/screenshots/landing.png)
