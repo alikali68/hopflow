@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import AppShell from '@/components/app/AppShell';
 import Topbar from '@/components/app/Topbar';
 import { useWallet } from '@solana/wallet-adapter-react';
@@ -49,6 +50,7 @@ const dangerBtn =
   'flex h-[44px] items-center justify-center gap-2 rounded-xl border border-red-400/40 bg-transparent px-5 text-[14px] font-semibold text-red-400 transition-colors hover:border-red-400';
 
 export default function SettingsPage() {
+  const router = useRouter();
   const { publicKey, connected, disconnect } = useWallet();
   const { setVisible } = useWalletModal();
   const { state, dispatch, storeKey } = useStore();
@@ -92,8 +94,11 @@ export default function SettingsPage() {
 
   const handleDisconnect = () => {
     // End the entry session too — a new wallet must sign again on entry.
+    // Every Disconnect exits the app to the landing page; only
+    // switch/change-wallet (the adapter menu) is exempt.
     clearSessionAuth();
     void disconnect();
+    router.push('/');
   };
 
   const handleClearSavedData = () => {

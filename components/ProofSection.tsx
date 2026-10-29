@@ -66,6 +66,97 @@ function EvidenceLinks({ t }: { t: ProofTransfer }) {
 }
 
 /**
+ * Stacked transfer card for the /proof page below lg (F5): the same
+ * columns as the detailed table, but stacked so nothing needs a
+ * horizontal swipe. At lg+ the table below is used instead.
+ */
+function FullTransferCard({
+  t,
+  fmtDate,
+  fmtDateTime,
+}: {
+  t: ProofTransfer;
+  fmtDate: (iso: string) => string;
+  fmtDateTime: (iso: string) => string;
+}) {
+  return (
+    <article
+      data-proof-card
+      className="glass-panel rounded-panel border border-border p-5"
+    >
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <div className="font-display text-[18px] font-bold leading-[24px] text-white">
+            Transfer #{t.id}
+          </div>
+          <div className="mt-1 text-[13px] text-textMuted">{t.externalId}</div>
+        </div>
+        <StatusChip status={t.status} />
+      </div>
+      <dl className="mt-4 space-y-2 text-[14px] leading-[20px]">
+        <div className="flex justify-between gap-3">
+          <dt className="text-textMuted">Amount</dt>
+          <dd className="font-semibold text-white">
+            {t.amountSol} SOL · fee {(t.feeBps / 100).toFixed(1)}%
+          </dd>
+        </div>
+        <div className="flex justify-between gap-3">
+          <dt className="text-textMuted">Recipient</dt>
+          <dd className="font-semibold text-white">
+            <a
+              href={explorerAddressUrl(t.recipientAddress)}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="underline decoration-white/30 underline-offset-2 transition-colors hover:text-[#14F195]"
+            >
+              {t.recipientLabel} · {trunc(t.recipientAddress)}
+            </a>
+          </dd>
+        </div>
+        <div className="flex justify-between gap-3">
+          <dt className="text-textMuted">Received</dt>
+          <dd className="font-semibold text-white">
+            {t.receivedSol !== null
+              ? `${t.receivedSol} SOL`
+              : t.expectedReceivedSol !== null
+                ? `Expected ${t.expectedReceivedSol} SOL`
+                : '—'}
+          </dd>
+        </div>
+        <div className="flex justify-between gap-3">
+          <dt className="text-textMuted">Completed / next</dt>
+          <dd className="text-right font-semibold text-white">
+            {t.completedAt
+              ? fmtDateTime(t.completedAt)
+              : t.nextHops.map((h) => (
+                  <div key={h.at}>
+                    {h.label}: {fmtDate(h.at)}
+                  </div>
+                ))}
+          </dd>
+        </div>
+        {t.hop0ExecutedAt && (
+          <div className="flex justify-between gap-3">
+            <dt className="text-textMuted">Hop 0 executed</dt>
+            <dd className="font-semibold text-white">{fmtDateTime(t.hop0ExecutedAt)}</dd>
+          </div>
+        )}
+        <div className="flex justify-between gap-3">
+          <dt className="text-textMuted">Hops</dt>
+          <dd className="font-semibold text-white">
+            {t.hopsExecuted}
+            {t.hopsTotal ? ` / ${t.hopsTotal}` : ''} executed
+          </dd>
+        </div>
+      </dl>
+      <div className="mt-4 border-t border-border pt-3 text-[13px] text-textMuted">
+        <EvidenceLinks t={t} />
+      </div>
+    </article>
+  );
+}
+
+/**
  * Public proof surface (judge review W2): the completed MultiHopper
  * transfers, verifiable on Solana Explorer with no wallet. `full` renders
  * the detailed table for the /proof page; the landing uses the compact
@@ -136,24 +227,33 @@ export default function ProofSection({ full = false }: { full?: boolean }) {
 
       {full ? (
         <>
-          {/* Detailed table — /proof page */}
-          <div className="mt-10 overflow-x-auto rounded-panel border border-border glass-panel">
-            <table className="w-full min-w-[760px] border-collapse text-left text-[14px] leading-[20px]">
+          {/* Stacked cards below lg (F5) — no horizontal swipe needed. */}
+          <div className="mt-10 flex flex-col gap-6 lg:hidden">
+            {PROOF_TRANSFERS.map((t) => (
+              <FullTransferCard key={t.id} t={t} fmtDate={fmtDate} fmtDateTime={fmtDateTime} />
+            ))}
+          </div>
+
+          {/* Detailed table — /proof page at lg+. Padding and font are
+              tightened (and the recipient link may wrap) so the table
+              fits 1024–1180 instead of overflowing. */}
+          <div className="mt-10 hidden overflow-x-auto rounded-panel border border-border glass-panel lg:block">
+            <table className="w-full min-w-[760px] border-collapse text-left text-[13px] leading-[20px]">
               <thead>
                 <tr className="border-b border-border text-[12px] font-bold uppercase tracking-wide text-textMuted">
-                  <th className="px-5 py-3">Transfer</th>
-                  <th className="px-5 py-3">Status</th>
-                  <th className="px-5 py-3">Amount</th>
-                  <th className="px-5 py-3">Recipient</th>
-                  <th className="px-5 py-3">Received</th>
-                  <th className="px-5 py-3">Completed / next</th>
-                  <th className="px-5 py-3">Evidence</th>
+                  <th className="px-2 py-3">Transfer</th>
+                  <th className="px-2 py-3">Status</th>
+                  <th className="px-2 py-3">Amount</th>
+                  <th className="px-2 py-3">Recipient</th>
+                  <th className="px-2 py-3">Received</th>
+                  <th className="px-2 py-3">Completed / next</th>
+                  <th className="px-2 py-3">Evidence</th>
                 </tr>
               </thead>
               <tbody>
                 {PROOF_TRANSFERS.map((t) => (
                   <tr key={t.id} className="border-b border-border last:border-0">
-                    <td className="px-5 py-4">
+                    <td className="px-2 py-4">
                       <div className="font-display text-[15px] font-bold text-white">
                         #{t.id}
                       </div>
@@ -161,37 +261,37 @@ export default function ProofSection({ full = false }: { full?: boolean }) {
                         {t.externalId}
                       </div>
                     </td>
-                    <td className="px-5 py-4">
+                    <td className="px-2 py-4">
                       <StatusChip status={t.status} />
                       <div className="mt-1.5 text-[12px] text-textMuted">
                         {t.hopsExecuted}
                         {t.hopsTotal ? ` / ${t.hopsTotal}` : ''} hops executed
                       </div>
                     </td>
-                    <td className="whitespace-nowrap px-5 py-4 font-semibold text-white">
+                    <td className="whitespace-nowrap px-2 py-4 font-semibold text-white">
                       {t.amountSol} SOL
                       <div className="mt-0.5 text-[12px] font-normal text-textMuted">
                         Fee {(t.feeBps / 100).toFixed(1)}%
                       </div>
                     </td>
-                    <td className="px-5 py-4">
+                    <td className="px-2 py-4">
                       <a
                         href={explorerAddressUrl(t.recipientAddress)}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="whitespace-nowrap font-semibold text-white underline decoration-white/30 underline-offset-2 transition-colors hover:text-[#14F195]"
+                        className="font-semibold text-white underline decoration-white/30 underline-offset-2 transition-colors hover:text-[#14F195]"
                       >
                         {t.recipientLabel} · {trunc(t.recipientAddress)}
                       </a>
                     </td>
-                    <td className="whitespace-nowrap px-5 py-4 font-semibold text-white">
+                    <td className="whitespace-nowrap px-2 py-4 font-semibold text-white">
                       {t.receivedSol !== null
                         ? `${t.receivedSol} SOL`
                         : t.expectedReceivedSol !== null
                           ? `Expected ${t.expectedReceivedSol} SOL`
                           : '—'}
                     </td>
-                    <td className="px-5 py-4 text-textMuted">
+                    <td className="px-2 py-4 text-textMuted">
                       {t.completedAt
                         ? fmtDateTime(t.completedAt)
                         : t.nextHops.map((h) => (
@@ -205,7 +305,7 @@ export default function ProofSection({ full = false }: { full?: boolean }) {
                         </div>
                       )}
                     </td>
-                    <td className="px-5 py-4 text-[13px] text-textMuted">
+                    <td className="px-2 py-4 text-[13px] text-textMuted">
                       <EvidenceLinks t={t} />
                     </td>
                   </tr>

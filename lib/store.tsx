@@ -39,6 +39,7 @@ import {
   type ScheduleMode,
 } from '@/components/builder/scheduleData';
 import { computeExecutionTimes } from './route-time';
+import { hashWalletAddress } from './session';
 import {
   seedStoreRoutes,
   refreshStaleNextExecutions,
@@ -100,7 +101,9 @@ export function storeKeyFor(address: string): string {
 
 /** Registry of wallet addresses that already saw the first-entry welcome
  * (one entry per wallet — the welcome shows on first entry only). The
- * registry holds addresses only, no data. */
+ * registry holds one-way SHA-256 hashes of addresses only, never the
+ * plaintext address (address privacy rule). Wallets welcomed before
+ * hashing simply see the welcome once more, then their hash is stored. */
 export const WELCOMED_KEY = 'hopflow-welcomed-v1';
 
 export function loadWelcomed(): string[] {
@@ -116,14 +119,15 @@ export function loadWelcomed(): string[] {
 }
 
 export function hasWelcomed(address: string): boolean {
-  return loadWelcomed().includes(address);
+  return loadWelcomed().includes(hashWalletAddress(address));
 }
 
 export function markWelcomed(address: string): void {
   try {
+    const hash = hashWalletAddress(address);
     const list = loadWelcomed();
-    if (!list.includes(address)) {
-      list.push(address);
+    if (!list.includes(hash)) {
+      list.push(hash);
       window.localStorage.setItem(WELCOMED_KEY, JSON.stringify(list));
     }
   } catch {
@@ -133,10 +137,33 @@ export function markWelcomed(address: string): void {
 
 export function clearWelcomed(address: string): void {
   try {
-    const list = loadWelcomed().filter((a) => a !== address);
+    const hash = hashWalletAddress(address);
+    const list = loadWelcomed().filter((a) => a !== hash);
     window.localStorage.setItem(WELCOMED_KEY, JSON.stringify(list));
   } catch {
     // Storage unavailable — nothing to clear.
+  }
+}
+
+/**
+ * Clear the demo flag on the shared (logged-out/demo) key. The persist
+ * effect only writes the ACTIVE key, so entering the app for real — or
+ * exiting demo — would otherwise leave a stale demoMode=true on the
+ * shared key, and a disconnected visitor typing an AppShell URL would
+ * then pass the R2 gate into the demo instead of landing. Callers: real
+ * entry (Hero) and demo exit (DemoBadge).
+ */
+export function clearSharedDemoFlag(): void {
+  try {
+    const raw = window.localStorage.getItem(STORE_KEY);
+    if (!raw) return;
+    const parsed: unknown = JSON.parse(raw);
+    if (!parsed || typeof parsed !== 'object') return;
+    const rec = parsed as Record<string, unknown>;
+    if (rec.demoMode !== true) return;
+    window.localStorage.setItem(STORE_KEY, JSON.stringify({ ...rec, demoMode: false }));
+  } catch {
+    // Storage unavailable — the gate re-checks on load; harmless.
   }
 }
 
@@ -1332,6 +1359,11 @@ const StoreContext = createContext<{
 
 export function StoreProvider({ children }: { children: React.ReactNode }) {
   const [state, dispatch] = useReducer(reducer, undefined, seedAppState);
+  // Set once the load effect below has settled the state for the current
+  // active key. The R2 AppShell gate waits for this: before it, the
+  // in-memory state is the seed (demoMode=false), so a demo visitor with
+  // a persisted demoMode=true would be mis-gated to landing.
+  const [storeReady, setStoreReady] = useState(false);
   // The wallet address, when a wallet is connected. StoreProvider sits
   // inside WalletProvider (root layout), so useWallet works here.
   const { publicKey, connected } = useWallet();
@@ -1360,6 +1392,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     if (loadedKeyRef.current === activeKey) return;
     loadedKeyRef.current = activeKey;
     skipNextWriteRef.current = true;
+    setStoreReady(false);
     try {
       const raw = window.localStorage.getItem(activeKey);
       if (raw) {
@@ -1381,6 +1414,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
               settings: { timezone: { ...stored.settings.timezone, resolved } },
             },
           });
+          setStoreReady(true);
           return;
         }
       }
@@ -1394,6 +1428,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     } catch {
       // Corrupted stored state: keep the seed state.
     }
+    setStoreReady(true);
     // The load intentionally keys on activeKey only: the settings it
     // inherits come from the state at switch time.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -1432,7 +1467,10 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     }
   }, [state]);
 
-  const value = useMemo(() => ({ state, dispatch, storeKey: activeKey }), [state, activeKey]);
+  const value = useMemo(
+    () => ({ state, dispatch, storeKey: activeKey, storeReady }),
+    [state, activeKey, storeReady],
+  );
   return <StoreContext.Provider value={value}>{children}</StoreContext.Provider>;
 }
 
@@ -1440,6 +1478,7 @@ export function useStore(): {
   state: AppState;
   dispatch: React.Dispatch<StoreAction>;
   storeKey: string;
+  storeReady: boolean;
 } {
   const ctx = useContext(StoreContext);
   if (!ctx) throw new Error('useStore must be used inside StoreProvider');

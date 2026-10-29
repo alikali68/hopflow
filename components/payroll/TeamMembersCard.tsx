@@ -90,7 +90,7 @@ export default function TeamMembersCard({ team }: TeamMembersCardProps) {
         <button
           type="button"
           onClick={handleToggleAdd}
-          className="flex h-[38px] items-center rounded-lg border border-[#262637] px-4 text-[13px] font-semibold text-[#B8B8C7] transition-colors hover:border-[#3A3A4D] hover:text-white"
+          className="flex h-11 items-center rounded-lg border border-[#262637] px-4 text-[13px] font-semibold text-[#B8B8C7] transition-colors hover:border-[#3A3A4D] hover:text-white"
         >
           {showAdd ? 'Cancel' : 'Add member'}
         </button>

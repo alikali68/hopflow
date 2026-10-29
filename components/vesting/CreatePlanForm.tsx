@@ -160,7 +160,7 @@ export default function CreatePlanForm() {
         <button
           type="button"
           onClick={() => dispatch({ type: 'vesting/saveDraft' })}
-          className="text-[13px] font-medium text-[#9A9AB0] transition-colors hover:text-white"
+          className="inline-flex min-h-[44px] items-center text-[13px] font-medium text-[#9A9AB0] transition-colors hover:text-white"
         >
           Save as draft
         </button>

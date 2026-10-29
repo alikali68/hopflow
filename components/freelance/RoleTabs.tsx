@@ -11,7 +11,7 @@ export default function RoleTabs({
     <button
       type="button"
       onClick={() => onChange(value)}
-      className={`h-[36px] rounded-lg px-4 text-[13.5px] font-semibold transition-all ${
+      className={`h-11 rounded-lg px-4 text-[13.5px] font-semibold transition-all ${
         role === value
           ? 'bg-gradient-to-r from-[#9945FF] to-[#14F195] text-white shadow-[0_0_15px_rgba(153,69,255,0.3)]'
           : 'text-[#9A9AB0] hover:text-white'

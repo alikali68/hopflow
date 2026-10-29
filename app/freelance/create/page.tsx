@@ -12,7 +12,7 @@ export default function CreateEscrowProjectPage() {
       <div>
         <a
           href="/freelance"
-          className="inline-flex items-center gap-2 text-[13.5px] font-medium text-[#9A9AB0] transition-colors hover:text-white"
+          className="inline-flex min-h-[44px] items-center gap-2 text-[13.5px] font-medium text-[#9A9AB0] transition-colors hover:text-white"
         >
           <ArrowLeftIcon size={15} />
           <span>Back to projects</span>

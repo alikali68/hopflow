@@ -40,13 +40,17 @@ export default function Topbar({
         </div>
 
         {/* New Route always navigates: an explicit href wins, otherwise the
-            builder. The old fallback was a <button> with no handler. */}
+            builder. The old fallback was a <button> with no handler.
+            Below sm the label shortens to "+ New" (F8) so the search
+            input keeps room; screen readers still hear the full label. */}
         <a
           href={newHref ?? '/builder'}
+          aria-label={newLabel}
           className="flex h-[46px] shrink-0 items-center gap-2 rounded-xl bg-gradient-to-r from-[#9945FF] to-[#14F195] px-4 text-[14px] font-bold text-white shadow-[0_0_20px_rgba(20,241,149,0.3)] transition-all hover:brightness-110 active:scale-95"
         >
           <SparklePlusIcon size={16} />
-          <span>{newLabel}</span>
+          <span className="hidden sm:inline">{newLabel}</span>
+          <span className="sm:hidden">+ New</span>
         </a>
       </div>
     </header>

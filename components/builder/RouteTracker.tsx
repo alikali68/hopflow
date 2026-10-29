@@ -4,6 +4,7 @@ import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { useWallet } from '@solana/wallet-adapter-react';
 import { WalletMultiButton } from '@solana/wallet-adapter-react-ui';
 import { signAuthMessage, authHeaders, type WalletAuth } from '@/lib/client-auth';
+import { setSessionAuth, saveSessionMarker } from '@/lib/session';
 import { useStore } from '@/lib/store';
 import { formatDateTimeUtc } from '@/lib/dates';
 import type { Transfer } from '@/lib/multihopper';
@@ -68,24 +69,31 @@ export default function RouteTracker({ id }: RouteTrackerProps) {
     setMounted(true);
   }, []);
 
-  // Wallet authentication: once the wallet connects, sign the auth message so
-  // the API proxy knows the caller owns the wallet. One extra Phantom prompt
-  // on connect — no funds move.
-  useEffect(() => {
+  // Wallet authentication — R1 soft gate: signing happens ONLY when the
+  // user taps "Sign to load live details" below, never on mount. A
+  // successful sign also establishes the entry session (in memory +
+  // remembered marker) for F11 auto-redirect on later landing visits.
+  const [signing, setSigning] = useState<boolean>(false);
+  const sign = useCallback(() => {
     if (isDemo) return;
-    if (!connected || !publicKey || !signMessage) return;
+    if (!connected || !publicKey || !signMessage || authSigningRef.current) return;
     const address = publicKey.toBase58();
-    if (walletAuth?.address === address || authSigningRef.current) return;
+    if (walletAuth?.address === address) return;
     authSigningRef.current = true;
+    setSigning(true);
     setAuthError(null);
     signAuthMessage(address, signMessage)
       .then((auth) => {
         setWalletAuth(auth);
-        authSigningRef.current = false;
+        setSessionAuth(auth);
+        saveSessionMarker(address);
       })
       .catch((err) => {
         setAuthError(err instanceof Error ? err.message : 'Auth signing failed');
+      })
+      .finally(() => {
         authSigningRef.current = false;
+        setSigning(false);
       });
   }, [connected, publicKey, signMessage, walletAuth, isDemo]);
 
@@ -199,7 +207,7 @@ export default function RouteTracker({ id }: RouteTrackerProps) {
         <div>
           <a
             href="/routes"
-            className="inline-flex items-center gap-2 text-[13.5px] font-medium text-[#9A9AB0] transition-colors hover:text-white"
+            className="inline-flex min-h-[44px] items-center gap-2 text-[13.5px] font-medium text-[#9A9AB0] transition-colors hover:text-white"
           >
             <ArrowLeftIcon size={15} />
             <span>Back to routes</span>
@@ -246,7 +254,7 @@ export default function RouteTracker({ id }: RouteTrackerProps) {
       <div>
         <a
           href="/builder"
-          className="inline-flex items-center gap-2 text-[13.5px] font-medium text-[#9A9AB0] transition-colors hover:text-white"
+          className="inline-flex min-h-[44px] items-center gap-2 text-[13.5px] font-medium text-[#9A9AB0] transition-colors hover:text-white"
         >
           <ArrowLeftIcon size={15} />
           <span>Back to builder</span>
@@ -303,22 +311,31 @@ export default function RouteTracker({ id }: RouteTrackerProps) {
         </div>
       )}
 
-      {/* Auth signing / auth error (Live Mode, connected) */}
+      {/* Auth prompt (Live Mode, connected) — R1: the user taps to sign,
+          never an automatic prompt on mount. */}
       {!isDemo && connected && !walletAuth && (
-        <div className="grad-border flex items-center gap-3 rounded-2xl p-4">
+        <div className="grad-border flex flex-col items-start gap-3 rounded-2xl p-4 sm:flex-row sm:items-center">
           <span className="icon-tile flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-[#F5C542]">
             <LockIcon size={20} />
           </span>
-          <div className="flex flex-col">
+          <div className="flex min-w-0 flex-1 flex-col">
             <span className="text-[14px] font-semibold text-white">
-              {authError ? 'Wallet auth failed' : 'Signing wallet auth message…'}
+              {authError ? 'Wallet auth failed' : 'Sign to load live details'}
             </span>
             <span className="text-[13px] text-[#9A9AB0]">
               {authError
-                ? `${authError} — reconnect the wallet to retry.`
-                : 'One extra Phantom prompt: it proves you own this wallet. No funds move.'}
+                ? `${authError} — tap below to try signing again.`
+                : 'One signature proves you own this wallet. No funds move.'}
             </span>
           </div>
+          <button
+            type="button"
+            onClick={sign}
+            disabled={signing}
+            className="flex h-[44px] shrink-0 items-center rounded-xl bg-gradient-to-r from-[#9945FF] to-[#14F195] px-5 text-[14px] font-bold text-white transition-all hover:brightness-110 disabled:opacity-60"
+          >
+            {signing ? 'Signing…' : authError ? 'Try signing again' : 'Sign to load'}
+          </button>
         </div>
       )}
 

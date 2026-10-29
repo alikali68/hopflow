@@ -80,8 +80,9 @@ export default function MilestoneWizard() {
           <span>Add milestone</span>
         </button>
 
-        {/* allocation status — one line: bar, badge on its end, label (per mockup) */}
-        <div className="mb-1 mt-8 flex items-center pr-2">
+        {/* allocation status — one line on desktop; wraps below sm so the
+            label never runs off the card edge on phones. */}
+        <div className="mb-1 mt-8 flex flex-wrap items-center pr-2">
           <div
             className={`h-[10px] shrink-0 rounded-full transition-all duration-300 ${
               isOver
@@ -108,7 +109,7 @@ export default function MilestoneWizard() {
             )}
           </span>
           <span
-            className={`ml-3.5 whitespace-nowrap text-[15px] font-semibold ${
+            className={`ml-3.5 whitespace-normal text-[15px] font-semibold ${
               remaining === 0 ? 'text-[#3DFFB5]' : remaining > 0 ? 'text-[#F5C542]' : 'text-[#F26D6D]'
             }`}
           >

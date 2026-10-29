@@ -15,14 +15,16 @@ import { useStore, hasWelcomed, markWelcomed } from '@/lib/store';
  */
 export default function WelcomeOverlay() {
   const router = useRouter();
-  const { state } = useStore();
+  const { state, storeReady } = useStore();
   const { publicKey, connected } = useWallet();
   const address = connected && publicKey ? publicKey.toBase58() : null;
   const [visible, setVisible] = useState(false);
 
   useEffect(() => {
-    setVisible(!state.demoMode && !!address && !hasWelcomed(address));
-  }, [state.demoMode, address]);
+    // Wait for the store load (R2): before it, demoMode is the seed
+    // default, so the overlay could flash over the gate placeholder.
+    setVisible(storeReady && !state.demoMode && !!address && !hasWelcomed(address));
+  }, [storeReady, state.demoMode, address]);
 
   if (!visible || !address) return null;
 

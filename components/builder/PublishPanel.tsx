@@ -14,6 +14,7 @@ import {
   authHeaders,
   type WalletAuth,
 } from '@/lib/client-auth';
+import { setSessionAuth, saveSessionMarker } from '@/lib/session';
 import type { Transfer, PreparedTxs } from '@/lib/multihopper';
 import {
   CheckCircleIcon,
@@ -83,26 +84,32 @@ export default function PublishPanel() {
 
   const activeWalletAddress = publicKey?.toBase58() || SOURCE_WALLET;
 
-  // Wallet auth (same pattern as the engine test): once the wallet connects,
-  // sign the auth message so the API proxy knows the caller owns the wallet.
-  // One extra Phantom prompt on connect — no funds move.
+  // Wallet auth — R1 soft gate: signing happens ONLY when the user taps
+  // publish, never on mount. A successful sign also establishes the entry
+  // session (in memory + remembered marker) for F11 auto-redirect.
   const authSigningRef = useRef(false);
-  useEffect(() => {
-    if (!connected || !publicKey || !signMessage) return;
+  const [signing, setSigning] = useState<boolean>(false);
+  const signNow = async (): Promise<WalletAuth | null> => {
+    if (!connected || !publicKey || !signMessage || authSigningRef.current) return walletAuth;
     const address = publicKey.toBase58();
-    if (walletAuth?.address === address || authSigningRef.current) return;
+    if (walletAuth?.address === address) return walletAuth;
     authSigningRef.current = true;
+    setSigning(true);
     setAuthError(null);
-    signAuthMessage(address, signMessage)
-      .then((auth) => {
-        setWalletAuth(auth);
-        authSigningRef.current = false;
-      })
-      .catch((err) => {
-        setAuthError(err instanceof Error ? err.message : 'Auth signing failed');
-        authSigningRef.current = false;
-      });
-  }, [connected, publicKey, signMessage, walletAuth]);
+    try {
+      const auth = await signAuthMessage(address, signMessage);
+      setWalletAuth(auth);
+      setSessionAuth(auth);
+      saveSessionMarker(address);
+      return auth;
+    } catch (err) {
+      setAuthError(err instanceof Error ? err.message : 'Auth signing failed');
+      return null;
+    } finally {
+      authSigningRef.current = false;
+      setSigning(false);
+    }
+  };
 
   // The publish gate: the same checks the Validation panel shows. The real
   // source is the connected wallet when there is one.
@@ -133,7 +140,7 @@ export default function PublishPanel() {
     setSteps(freshSteps());
   };
 
-  const runFlow = async (startIndex: number) => {
+  const runFlow = async (startIndex: number, authOverride?: WalletAuth) => {
     if (!signTransaction) {
       updateStep(startIndex, {
         status: 'failed',
@@ -141,14 +148,15 @@ export default function PublishPanel() {
       });
       return;
     }
-    if (!walletAuth) {
+    const auth = authOverride ?? walletAuth;
+    if (!auth) {
       updateStep(startIndex, {
         status: 'failed',
         error: 'Wallet auth required — connect your wallet and sign the auth message first.',
       });
       return;
     }
-    const headers = authHeaders(walletAuth);
+    const headers = authHeaders(auth);
 
     setFlowRunning(true);
     let currentId = transferId;
@@ -577,12 +585,12 @@ export default function PublishPanel() {
           </span>
           <div className="flex flex-col">
             <span className="text-[14px] font-semibold text-white">
-              {authError ? 'Wallet auth failed' : 'Signing wallet auth message…'}
+              {authError ? 'Wallet auth failed' : 'Sign once to publish'}
             </span>
             <span className="text-[13px] text-[#9A9AB0]">
               {authError
-                ? `${authError} — reconnect the wallet to retry.`
-                : 'One extra Phantom prompt: it proves you own this wallet. No funds move.'}
+                ? `${authError} — tap Publish again to retry signing.`
+                : 'Publishing asks you to sign once: it proves you own this wallet. No funds move.'}
             </span>
           </div>
         </div>
@@ -596,11 +604,18 @@ export default function PublishPanel() {
         <>
           <button
             type="button"
-            onClick={() => runFlow(0)}
-            disabled={flowRunning || !walletAuth || !!blockingError}
+            onClick={async () => {
+              if (walletAuth) {
+                void runFlow(0);
+                return;
+              }
+              const auth = await signNow();
+              if (auth) void runFlow(0, auth);
+            }}
+            disabled={flowRunning || signing || !!blockingError}
             className="flex h-[56px] w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-[#9945FF] to-[#14F195] text-[15px] font-bold text-white transition hover:brightness-110 active:scale-[0.99] disabled:opacity-40"
           >
-            <span>Sign &amp; publish route</span>
+            <span>{signing ? 'Signing…' : 'Sign & publish route'}</span>
             <ChevronRightIcon size={18} />
           </button>
           {blockingError ? (

@@ -86,7 +86,7 @@ export default function ProjectRow({
         {project.status === 'Awaiting Approval' && role === 'client' && (
           <a
             href={`/freelance/${project.id}#review`}
-            className="mt-2 flex h-[30px] items-center rounded-lg bg-gradient-to-r from-[#9945FF] to-[#14F195] px-3 text-[12px] font-bold text-white shadow-sm transition-all hover:brightness-110 active:scale-95"
+            className="mt-2 flex h-11 items-center rounded-lg bg-gradient-to-r from-[#9945FF] to-[#14F195] px-3 text-[12px] font-bold text-white shadow-sm transition-all hover:brightness-110 active:scale-95"
           >
             Review
           </a>

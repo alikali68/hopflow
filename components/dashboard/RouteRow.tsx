@@ -58,7 +58,7 @@ export default function RouteRow({ route }: { route: StoreRoute }) {
           openTracking();
         }
       }}
-      className="grad-border-soft group flex cursor-pointer gap-4 rounded-xl p-4 transition-colors duration-200 hover:bg-white/[0.03]"
+      className="grad-border-soft group flex flex-wrap cursor-pointer gap-4 rounded-xl p-4 transition-colors duration-200 hover:bg-white/[0.03]"
     >
       <span className="icon-tile flex h-[46px] w-[46px] shrink-0 items-center justify-center rounded-xl">
         {TYPE_ICON[route.type]}
@@ -66,7 +66,7 @@ export default function RouteRow({ route }: { route: StoreRoute }) {
 
       <div className="min-w-0 flex-1">
         <div className="flex items-baseline gap-2">
-          <h4 className="font-display truncate text-[16px] font-bold text-white">{route.name}</h4>
+          <h4 className="font-display truncate text-[16px] font-bold text-white max-md:whitespace-normal">{route.name}</h4>
           <span className="shrink-0 text-[12px] text-[#9A9AB0]">{route.type}</span>
         </div>
 
@@ -89,24 +89,28 @@ export default function RouteRow({ route }: { route: StoreRoute }) {
         </div>
       </div>
 
-      <div className="flex shrink-0 flex-col items-end">
+      {/* Below md this column takes its own full-width line (amount +
+          status in a row), so the title above is never crushed to a few
+          characters. Visual order on phones is title → progress →
+          hops/next → amount/status: all full-width, no truncation. */}
+      <div className="flex shrink-0 flex-col items-end max-md:basis-full max-md:flex-row max-md:items-center max-md:justify-between max-md:gap-2">
         <span className="font-display whitespace-nowrap text-[17px] font-bold text-white">
           {route.amount.toLocaleString('en-US')} {route.token}
         </span>
         <span
-          className={`mt-2 inline-flex items-center gap-1.5 rounded-full border px-2.5 py-[3px] text-[11px] font-semibold ${CHIP[route.status]}`}
+          className={`mt-2 inline-flex items-center gap-1.5 rounded-full border px-2.5 py-[3px] text-[11px] font-semibold max-md:mt-0 ${CHIP[route.status]}`}
         >
           <span className={`h-1.5 w-1.5 rounded-full ${DOT[route.status]}`} />
           {route.status}
         </span>
-        <span className="mt-auto flex items-center gap-1 pt-2 text-[#9A9AB0]">
+        <span className="mt-auto flex items-center gap-1 pt-2 text-[#9A9AB0] max-md:mt-0 max-md:pt-0">
           {route.status === 'Active' && (
             <button
               type="button"
               aria-label={`Pause route ${route.name}`}
               title="Pause route (local display only — does not affect on-chain execution)"
               onClick={togglePause}
-              className="flex h-6 w-6 items-center justify-center rounded-md opacity-0 transition-opacity hover:bg-white/10 hover:text-white focus:opacity-100 group-hover:opacity-100"
+              className="flex h-11 w-11 items-center justify-center rounded-md opacity-0 transition-opacity hover:bg-white/10 hover:text-white focus:opacity-100 group-hover:opacity-100 max-md:opacity-100"
             >
               <PauseIcon size={13} />
             </button>
@@ -117,7 +121,7 @@ export default function RouteRow({ route }: { route: StoreRoute }) {
               aria-label={`Resume route ${route.name}`}
               title="Resume route"
               onClick={togglePause}
-              className="flex h-6 w-6 items-center justify-center rounded-md opacity-0 transition-opacity hover:bg-white/10 hover:text-white focus:opacity-100 group-hover:opacity-100"
+              className="flex h-11 w-11 items-center justify-center rounded-md opacity-0 transition-opacity hover:bg-white/10 hover:text-white focus:opacity-100 group-hover:opacity-100 max-md:opacity-100"
             >
               <PlayIcon size={13} />
             </button>

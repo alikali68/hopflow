@@ -25,7 +25,7 @@ export default function ReviewAndFundPage() {
       <div className="mx-auto w-full max-w-[1060px] px-8 py-7">
         <a
           href="/freelance/create/milestones"
-          className="inline-flex items-center gap-1.5 text-[13px] font-medium text-[#9A9AB0] transition-colors hover:text-white"
+          className="inline-flex min-h-[44px] items-center gap-1.5 text-[13px] font-medium text-[#9A9AB0] transition-colors hover:text-white"
         >
           <ArrowLeftIcon size={15} />
           <span>Back to milestones</span>

@@ -48,7 +48,7 @@ export default function ApprovalBox({ projectId, milestone, token }: ApprovalBox
           href={`https://${milestone.deliverable}`}
           target="_blank"
           rel="noopener noreferrer"
-          className="inline-flex items-center gap-1.5 text-[13.5px] font-semibold transition-opacity hover:opacity-90"
+          className="inline-flex min-h-[44px] items-center gap-1.5 text-[13.5px] font-semibold transition-opacity hover:opacity-90"
         >
           <span className="bg-gradient-to-r from-[#9945FF] to-[#14F195] bg-clip-text text-transparent">
             {milestone.deliverable}
@@ -111,7 +111,7 @@ export default function ApprovalBox({ projectId, milestone, token }: ApprovalBox
               />
               <button
                 type="submit"
-                className="mt-2 flex h-[36px] items-center rounded-lg bg-gradient-to-r from-[#9945FF] to-[#14F195] px-4 text-[13px] font-bold text-white shadow-sm transition hover:brightness-110 active:scale-95"
+                className="mt-2 flex h-11 items-center rounded-lg bg-gradient-to-r from-[#9945FF] to-[#14F195] px-4 text-[13px] font-bold text-white shadow-sm transition hover:brightness-110 active:scale-95"
               >
                 Send request
               </button>

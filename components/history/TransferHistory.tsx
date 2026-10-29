@@ -5,6 +5,7 @@ import React, { useEffect, useMemo, useRef, useState, useCallback } from 'react'
 import { useWallet } from '@solana/wallet-adapter-react';
 import { WalletMultiButton } from '@solana/wallet-adapter-react-ui';
 import { signAuthMessage, authHeaders, type WalletAuth } from '@/lib/client-auth';
+import { setSessionAuth, saveSessionMarker } from '@/lib/session';
 import type { Transfer } from '@/lib/multihopper';
 import { normalizeStatus, firstSignature, formatSol } from './historyData';
 import TransferRow from './TransferRow';
@@ -32,10 +33,11 @@ export default function TransferHistory() {
   const authSigningRef = useRef(false);
 
   const [transfers, setTransfers] = useState<Transfer[]>([]);
-  const [loading, setLoading] = useState<boolean>(true);
+  const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [authError, setAuthError] = useState<string | null>(null);
   const [walletAuth, setWalletAuth] = useState<WalletAuth | null>(null);
+  const [signing, setSigning] = useState<boolean>(false);
   const [mounted, setMounted] = useState<boolean>(false);
   const [query, setQuery] = useState<string>('');
   const [filter, setFilter] = useState<'All' | 'Completed' | 'In progress' | 'Failed'>('All');
@@ -45,32 +47,38 @@ export default function TransferHistory() {
     setMounted(true);
   }, []);
 
-  // Wallet auth effect
-  useEffect(() => {
-    if (!publicKey || !signMessage) {
-      setWalletAuth(null);
-      setAuthError(null);
-      setLoading(false);
-      return;
-    }
+  // Wallet auth — R1 soft gate: signing happens ONLY when the user taps
+  // "Sign to load history" below, never on mount. A successful sign also
+  // establishes the entry session (in memory + remembered marker), so a
+  // later landing visit can auto-redirect (F11) without another sign.
+  const sign = useCallback(() => {
+    if (!publicKey || !signMessage || authSigningRef.current) return;
     const address = publicKey.toBase58();
     if (walletAuth?.address === address) return;
-    if (authSigningRef.current) return;
-
     authSigningRef.current = true;
+    setSigning(true);
+    setAuthError(null);
     signAuthMessage(address, signMessage)
       .then((auth) => {
         setWalletAuth(auth);
         setAuthError(null);
+        setSessionAuth(auth);
+        saveSessionMarker(address);
       })
       .catch((err) => {
         setAuthError(err instanceof Error ? err.message : 'Wallet authentication failed');
-        setLoading(false);
       })
       .finally(() => {
         authSigningRef.current = false;
+        setSigning(false);
       });
   }, [publicKey, signMessage, walletAuth]);
+
+  // A disconnect clears the component's auth (the entry session is
+  // cleared by the Disconnect handlers themselves).
+  useEffect(() => {
+    if (!publicKey) setWalletAuth(null);
+  }, [publicKey]);
 
   // Load transfers from API
   const load = useCallback(
@@ -167,8 +175,7 @@ export default function TransferHistory() {
     return formatSol(total);
   }, [transfers]);
 
-  // Wallet auth error state (shown before the connect gate: without this,
-  // a failed signature would leave the loading spinner up forever, since
+  // Wallet auth error state (shown when the user-tapped sign fails, since
   // load() only runs once walletAuth exists).
   if (authError && transfers.length === 0) {
     return (
@@ -185,14 +192,26 @@ export default function TransferHistory() {
           </span>
           <p className="text-[14px] text-[#F26D6D]">{authError}</p>
           <p className="text-[13px] text-[#9A9AB0]">
-            Reconnect your wallet to try signing again.
+            {publicKey ? 'Tap below to try signing again.' : 'Reconnect your wallet to try signing again.'}
           </p>
+          {publicKey && (
+            <button
+              type="button"
+              onClick={sign}
+              disabled={signing}
+              className="mt-1 flex h-[44px] items-center rounded-xl bg-gradient-to-r from-[#9945FF] to-[#14F195] px-5 text-[14px] font-bold text-white transition-all hover:brightness-110 disabled:opacity-60"
+            >
+              {signing ? 'Signing…' : 'Try signing again'}
+            </button>
+          )}
         </div>
       </div>
     );
   }
 
-  // Disconnected view
+  // Not authed yet: connected wallets get an inline sign prompt (R1 —
+  // no auto-sign on mount); disconnected visitors get the connect prompt
+  // (demo mode reaches this branch with no wallet, same as before).
   if (!walletAuth && !loading) {
     return (
       <div className="flex flex-col gap-6">
@@ -206,14 +225,34 @@ export default function TransferHistory() {
           <span className="icon-tile flex h-10 w-10 items-center justify-center rounded-xl text-white">
             <LockIcon size={20} />
           </span>
-          <h2 className="font-display text-[18px] font-bold text-white">Connect your wallet</h2>
-          <p className="max-w-[420px] text-[14px] text-[#9A9AB0]">
-            Connect your Phantom devnet wallet to see your transfer history.
-          </p>
-          {mounted && (
-            <div className="mt-2">
-              <WalletMultiButton className="!h-[44px] !rounded-xl !bg-gradient-to-r !from-[#9945FF] !to-[#14F195] !px-5 !font-display !text-[14px] !font-bold !text-white !shadow-[0_0_20px_rgba(153,69,255,0.35)] transition-all hover:!brightness-110" />
-            </div>
+          {publicKey ? (
+            <>
+              <h2 className="font-display text-[18px] font-bold text-white">Sign to load your history</h2>
+              <p className="max-w-[420px] text-[14px] text-[#9A9AB0]">
+                Sign once to prove you own this wallet — no funds move. Your
+                transfers load right after signing.
+              </p>
+              <button
+                type="button"
+                onClick={sign}
+                disabled={signing}
+                className="mt-2 flex h-[44px] items-center rounded-xl bg-gradient-to-r from-[#9945FF] to-[#14F195] px-5 font-display text-[14px] font-bold text-white shadow-[0_0_20px_rgba(153,69,255,0.35)] transition-all hover:brightness-110 disabled:opacity-60"
+              >
+                {signing ? 'Signing…' : 'Sign to load history'}
+              </button>
+            </>
+          ) : (
+            <>
+              <h2 className="font-display text-[18px] font-bold text-white">Connect your wallet</h2>
+              <p className="max-w-[420px] text-[14px] text-[#9A9AB0]">
+                Connect your Phantom devnet wallet to see your transfer history.
+              </p>
+              {mounted && (
+                <div className="mt-2">
+                  <WalletMultiButton className="!h-[44px] !rounded-xl !bg-gradient-to-r !from-[#9945FF] !to-[#14F195] !px-5 !font-display !text-[14px] !font-bold !text-white !shadow-[0_0_20px_rgba(153,69,255,0.35)] transition-all hover:!brightness-110" />
+                </div>
+              )}
+            </>
           )}
         </div>
       </div>
@@ -339,7 +378,7 @@ export default function TransferHistory() {
                 role="tab"
                 aria-selected={isSelected}
                 onClick={() => setFilter(tab)}
-                className={`h-[34px] rounded-full px-3.5 text-[12.5px] font-semibold transition-all ${
+                className={`h-11 rounded-full px-3.5 text-[12.5px] font-semibold transition-all ${
                   isSelected
                     ? 'bg-gradient-to-r from-[#9945FF] to-[#14F195] text-white shadow-[0_0_15px_rgba(20,241,149,0.25)]'
                     : 'border border-[#2A2A3D] bg-white/[0.02] text-[#B8B8C7] hover:border-[#3A3A4D] hover:text-white'
@@ -355,7 +394,7 @@ export default function TransferHistory() {
           type="button"
           onClick={() => load(true)}
           disabled={refreshing}
-          className="h-[34px] rounded-full border border-white/15 bg-white/5 px-3.5 text-[12.5px] font-semibold text-white transition-colors hover:bg-white/10 disabled:opacity-50"
+          className="h-11 rounded-full border border-white/15 bg-white/5 px-3.5 text-[12.5px] font-semibold text-white transition-colors hover:bg-white/10 disabled:opacity-50"
         >
           {refreshing ? 'Refreshing…' : 'Refresh'}
         </button>

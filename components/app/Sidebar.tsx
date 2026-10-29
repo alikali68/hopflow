@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { useWallet } from '@solana/wallet-adapter-react';
 import { useWalletModal } from '@solana/wallet-adapter-react-ui';
 import { clearSessionAuth } from '@/lib/session';
@@ -33,7 +34,8 @@ function truncateAddress(address: string): string {
   return `${address.slice(0, 4)}...${address.slice(-4)}`;
 }
 
-export default function Sidebar({ active = 'Dashboard' }: { active?: string }) {
+export default function Sidebar({ active = 'Dashboard', className = '' }: { active?: string; className?: string }) {
+  const router = useRouter();
   const { publicKey, connected, disconnect } = useWallet();
   const { setVisible } = useWalletModal();
   // Wallet card renders the connected state only after mount: with
@@ -49,11 +51,14 @@ export default function Sidebar({ active = 'Dashboard' }: { active?: string }) {
 
   const handleDisconnect = () => {
     // End the entry session too — a new wallet must sign again on entry.
+    // Every Disconnect exits the app to the landing page; only
+    // switch/change-wallet (the adapter menu) is exempt.
     clearSessionAuth();
     void disconnect();
+    router.push('/');
   };
   return (
-    <aside className="sticky top-6 flex flex-col gap-4">
+    <aside className={`sticky top-6 flex flex-col gap-4 ${className}`}>
       {/* compact brand row — the real HopFlow mark */}
       <div className="glass-panel flex h-[64px] items-center gap-3 rounded-2xl px-5">
         <img src="/logo-mark.webp" alt="HopFlow logo" className="h-9 w-9 shrink-0 object-contain" />
@@ -134,7 +139,7 @@ export default function Sidebar({ active = 'Dashboard' }: { active?: string }) {
               <button
                 type="button"
                 onClick={() => setVisible(true)}
-                className="mt-2.5 flex h-[36px] w-full items-center justify-center rounded-lg bg-gradient-to-r from-[#9945FF] to-[#14F195] text-[13px] font-bold text-white transition-all hover:brightness-110 active:scale-[0.98]"
+                className="mt-2.5 flex h-11 w-full items-center justify-center rounded-lg bg-gradient-to-r from-[#9945FF] to-[#14F195] text-[13px] font-bold text-white transition-all hover:brightness-110 active:scale-[0.98]"
               >
                 Connect Wallet
               </button>

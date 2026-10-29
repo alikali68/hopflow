@@ -31,8 +31,9 @@ export default function MemberRow({
 
   return (
     <div className="grad-border-soft rounded-2xl p-4">
-      {/* Line 1: Grip, Number Badge, Member Name, Gradient Salary Pill */}
-      <div className="flex items-center gap-3">
+      {/* Line 1 wraps below md: name full-width on line 1, the salary
+          pill on its own full-width line. Desktop layout unchanged. */}
+      <div className="flex flex-wrap items-center gap-3">
         <span className="flex h-7 w-7 items-center justify-center text-[#5C5C72]">
           <GripIcon className="shrink-0 cursor-grab transition-colors hover:text-white" size={16} />
         </span>
@@ -44,10 +45,10 @@ export default function MemberRow({
           value={member.name}
           onChange={(e) => onChange({ name: e.target.value })}
           placeholder="Member name"
-          className="h-[48px] flex-1 rounded-xl border border-[#262637] bg-white/[0.02] px-4 text-[15px] font-semibold text-white outline-none transition-colors focus:border-[#9945FF]/60 focus:ring-2 focus:ring-[#9945FF]/20"
+          className="h-[48px] min-w-0 flex-1 basis-[140px] rounded-xl border border-[#262637] bg-white/[0.02] px-4 text-[15px] font-semibold text-white outline-none transition-colors focus:border-[#9945FF]/60 focus:ring-2 focus:ring-[#9945FF]/20"
         />
         {/* Salary pill */}
-        <div className="flex h-[48px] w-[190px] shrink-0 items-center justify-center gap-1 rounded-xl bg-gradient-to-r from-[#9945FF] to-[#14F195] px-3 text-[15px] font-bold text-white shadow-[0_0_15px_rgba(153,69,255,0.3)]">
+        <div className="flex h-[48px] w-[190px] shrink-0 items-center justify-center gap-1 rounded-xl bg-gradient-to-r from-[#9945FF] to-[#14F195] px-3 text-[15px] font-bold text-white shadow-[0_0_15px_rgba(153,69,255,0.3)] max-md:w-auto max-md:flex-1">
           <span>$</span>
           <input
             type="text"
@@ -61,9 +62,10 @@ export default function MemberRow({
         </div>
       </div>
 
-      {/* Line 2: Wallet Input with Validation + Remove Trash Button */}
-      <div className="mt-3 flex items-center gap-3 pl-[44px]">
-        <div className="relative flex-1">
+      {/* Line 2 wraps below md: address on its own line, remove below
+          it — everything stays inside the card. */}
+      <div className="mt-3 flex flex-wrap items-center gap-3 pl-[44px] max-md:pl-0">
+        <div className="relative flex-1 max-md:basis-full">
           <input
             type="text"
             value={member.wallet}
@@ -90,7 +92,7 @@ export default function MemberRow({
           onClick={onRemove}
           disabled={!canRemove}
           aria-label="Remove member"
-          className="shrink-0 p-2 text-[#9A9AB0] transition-colors hover:text-red-400 disabled:opacity-30 disabled:hover:text-[#9A9AB0]"
+          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-[#9A9AB0] transition-colors hover:text-red-400 disabled:opacity-30 disabled:hover:text-[#9A9AB0]"
         >
           <TrashIcon size={17} />
         </button>

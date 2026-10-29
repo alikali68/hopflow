@@ -136,7 +136,7 @@ export default function HopRow({
         <span className="text-[12px] font-semibold text-[#9A9AB0]">
           Token
         </span>
-        <div className="mt-1 flex h-[44px] rounded-lg border border-[#262637] bg-[#0B0B12] p-1">
+        <div className="mt-1 flex h-[54px] rounded-lg border border-[#262637] bg-[#0B0B12] p-1">
           <button
             type="button"
             onClick={() => onChange({ token: 'SOL' })}
@@ -170,7 +170,7 @@ export default function HopRow({
             type="button"
             onClick={onDuplicate}
             aria-label={`Duplicate hop ${index + 1}`}
-            className="flex h-9 w-9 items-center justify-center rounded-lg border border-[#262637] text-[#9A9AB0] transition-colors hover:border-[#3A3A4D] hover:text-white"
+            className="flex h-11 w-11 items-center justify-center rounded-lg border border-[#262637] text-[#9A9AB0] transition-colors hover:border-[#3A3A4D] hover:text-white"
           >
             <CopyIcon size={16} />
           </button>
@@ -183,7 +183,7 @@ export default function HopRow({
             onClick={onRemove}
             disabled={!canRemove}
             aria-label={`Remove hop ${index + 1}`}
-            className="flex h-9 w-9 items-center justify-center rounded-lg border border-[#262637] text-[#9A9AB0] transition-colors hover:border-[#3A3A4D] hover:text-white disabled:cursor-not-allowed disabled:opacity-30 hover:disabled:border-[#262637] hover:disabled:text-[#9A9AB0]"
+            className="flex h-11 w-11 items-center justify-center rounded-lg border border-[#262637] text-[#9A9AB0] transition-colors hover:border-[#3A3A4D] hover:text-white disabled:cursor-not-allowed disabled:opacity-30 hover:disabled:border-[#262637] hover:disabled:text-[#9A9AB0]"
           >
             <TrashIcon size={16} />
           </button>

@@ -135,14 +135,14 @@ export default function DatePicker({
       </button>
 
       {open && (
-        <div className="absolute left-0 top-[calc(100%+8px)] z-50 w-[300px] rounded-2xl border border-white/[0.13] bg-[#10101A] p-4 shadow-[0_20px_50px_rgba(0,0,0,0.6)]">
+        <div className="absolute left-0 top-[calc(100%+8px)] z-50 w-[300px] rounded-2xl border border-white/[0.13] bg-[#10101A] p-4 shadow-[0_20px_50px_rgba(0,0,0,0.6)] max-md:left-1/2 max-md:w-[calc(100vw-48px)] max-md:max-w-[300px] max-md:-translate-x-1/2">
           {/* Month navigation */}
           <div className="flex items-center justify-between">
             <button
               type="button"
               onClick={() => shiftMonth(-1)}
               aria-label="Previous month"
-              className="flex h-8 w-8 items-center justify-center rounded-lg text-[#9A9AB0] transition-colors hover:bg-white/5 hover:text-white"
+              className="flex h-11 w-11 items-center justify-center rounded-lg text-[#9A9AB0] transition-colors hover:bg-white/5 hover:text-white"
             >
               <ChevronLeftIcon size={16} />
             </button>
@@ -153,7 +153,7 @@ export default function DatePicker({
               type="button"
               onClick={() => shiftMonth(1)}
               aria-label="Next month"
-              className="flex h-8 w-8 items-center justify-center rounded-lg text-[#9A9AB0] transition-colors hover:bg-white/5 hover:text-white"
+              className="flex h-11 w-11 items-center justify-center rounded-lg text-[#9A9AB0] transition-colors hover:bg-white/5 hover:text-white"
             >
               <ChevronRightIcon size={16} />
             </button>
@@ -184,7 +184,7 @@ export default function DatePicker({
                     setOpen(false);
                   }}
                   aria-label={formatLongDate(date)}
-                  className={`flex h-9 items-center justify-center rounded-lg text-[13px] transition-colors ${
+                  className={`flex h-11 items-center justify-center rounded-lg text-[13px] transition-colors ${
                     selected
                       ? 'bg-gradient-to-r from-[#9945FF] to-[#14F195] font-bold text-white shadow-[0_0_12px_rgba(153,69,255,0.4)]'
                       : isToday
@@ -205,14 +205,14 @@ export default function DatePicker({
             <button
               type="button"
               onClick={goToday}
-              className="text-[13px] font-semibold text-[#14F195] transition-colors hover:text-white"
+              className="inline-flex min-h-[44px] items-center text-[13px] font-semibold text-[#14F195] transition-colors hover:text-white"
             >
               Today
             </button>
             <button
               type="button"
               onClick={() => setOpen(false)}
-              className="text-[13px] font-semibold text-[#9A9AB0] transition-colors hover:text-white"
+              className="inline-flex min-h-[44px] items-center text-[13px] font-semibold text-[#9A9AB0] transition-colors hover:text-white"
             >
               Done
             </button>

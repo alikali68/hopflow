@@ -3,15 +3,13 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useWallet } from '@solana/wallet-adapter-react';
-import { signAuthMessage } from '@/lib/client-auth';
 import {
   getSessionAuth,
-  setSessionAuth,
   loadSessionMarker,
-  saveSessionMarker,
   isValidSessionMarker,
 } from '@/lib/session';
-import { useStore } from '@/lib/store';
+import { useStore, clearSharedDemoFlag } from '@/lib/store';
+import { LAUNCH_GUIDE_FLAG } from '@/components/app/AppShell';
 import { PlayIcon } from './icons';
 
 function NodeGlyph({ index, cx, cy }: { index: number; cx: number; cy: number }) {
@@ -144,42 +142,10 @@ export default function Hero({
   onHighlightConnect?: (on: boolean) => void;
 }) {
   const router = useRouter();
-  const { publicKey, signMessage, connected } = useWallet();
-  const { dispatch } = useStore();
-  const [launchState, setLaunchState] = useState<'idle' | 'guide' | 'signing' | 'error'>('idle');
-  const [launchError, setLaunchError] = useState<string | null>(null);
-  const signingRef = useRef(false);
-
-  // Sign the auth message to establish a session, then enter the app.
-  // No funds move — the signature only proves the user owns the wallet.
-  const signAndEnter = async (address: string) => {
-    if (!signMessage) {
-      setLaunchError('This wallet cannot sign messages — use Phantom to enter the app.');
-      setLaunchState('error');
-      return;
-    }
-    if (signingRef.current) return;
-    signingRef.current = true;
-    setLaunchState('signing');
-    setLaunchError(null);
-    try {
-      const auth = await signAuthMessage(address, signMessage);
-      setSessionAuth(auth);
-      // Remember this wallet signed in (address + timestamp only — the
-      // signature itself stays in memory). After a reload the wallet
-      // reconnects and Launch App lets this wallet straight in.
-      saveSessionMarker(address);
-      dispatch({ type: 'session/setDemoMode', demoMode: false });
-      router.push('/dashboard');
-    } catch (err) {
-      setLaunchError(
-        err instanceof Error ? err.message : 'Signing failed — the app was not opened.',
-      );
-      setLaunchState('error');
-    } finally {
-      signingRef.current = false;
-    }
-  };
+  const { publicKey, connected } = useWallet();
+  const { state, dispatch } = useStore();
+  const [launchState, setLaunchState] = useState<'idle' | 'guide'>('idle');
+  const autoRedirectedRef = useRef(false);
 
   const dismissGuide = () => {
     setLaunchState('idle');
@@ -187,20 +153,15 @@ export default function Hero({
   };
 
   const handleLaunchApp = () => {
-    setLaunchError(null);
     if (connected && publicKey) {
-      // Already connected: if this wallet already has a session — the
-      // in-memory one, or a remembered sign-in from before a reload —
-      // enter directly; otherwise sign once, then enter.
-      const address = publicKey.toBase58();
-      const existing = getSessionAuth();
-      const remembered = isValidSessionMarker(loadSessionMarker(), address);
-      if ((existing && existing.address === address) || remembered) {
-        dispatch({ type: 'session/setDemoMode', demoMode: false });
-        router.push('/dashboard');
-        return;
-      }
-      void signAndEnter(address);
+      // R1: a connected wallet NEVER signs on entry — the tap lands on
+      // /dashboard directly. Signing is deferred to the action that
+      // actually needs auth (publishing, auth-gated API calls), where an
+      // inline prompt asks for it. On a phone this is what keeps the tap
+      // from app-switching into the wallet app for a signature.
+      dispatch({ type: 'session/setDemoMode', demoMode: false });
+      clearSharedDemoFlag();
+      router.push('/dashboard');
       return;
     }
     // No wallet yet: do NOT silently open the connect modal. Show the
@@ -211,26 +172,60 @@ export default function Hero({
   };
 
   // The user connected (via the header button) while the guidance was
-  // shown: stop highlighting and enter. A wallet that already has a
-  // session — in-memory, or a remembered sign-in from before a reload —
-  // enters directly, exactly like handleLaunchApp's connected branch;
-  // otherwise sign once, then enter. (Without this check, a click that
-  // lands before autoConnect finishes would re-sign needlessly.)
+  // shown: stop highlighting and enter directly (R1 — no entry signing,
+  // exactly like handleLaunchApp's connected branch).
   useEffect(() => {
     if (launchState !== 'guide') return;
     if (!connected || !publicKey) return;
     onHighlightConnect?.(false);
+    dispatch({ type: 'session/setDemoMode', demoMode: false });
+    clearSharedDemoFlag();
+    router.push('/dashboard');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [launchState, connected, publicKey]);
+
+  // F11: arriving on landing ALREADY connected with a valid session —
+  // autoConnect restore, or a return from the mobile wallet app — enters
+  // directly, with no tap and no manual URL. Connected WITHOUT a session
+  // does not auto-redirect: the tap path stays (and under R1 that tap
+  // enters without signing). Never fires in demo mode, while the guide
+  // or signing flows are active, or when disconnected — so a
+  // disconnected landing, and a disconnect back to landing, both stay
+  // put, and there is no redirect loop.
+  useEffect(() => {
+    if (autoRedirectedRef.current) return;
+    if (launchState !== 'idle') return;
+    if (state.demoMode) return;
+    if (!connected || !publicKey) return;
     const address = publicKey.toBase58();
     const existing = getSessionAuth();
     const remembered = isValidSessionMarker(loadSessionMarker(), address);
     if ((existing && existing.address === address) || remembered) {
+      autoRedirectedRef.current = true;
       dispatch({ type: 'session/setDemoMode', demoMode: false });
+      clearSharedDemoFlag();
       router.push('/dashboard');
-      return;
     }
-    void signAndEnter(address);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [launchState, connected, publicKey]);
+  }, [launchState, state.demoMode, connected, publicKey]);
+
+  // R2: the AppShell gate set the guidance flag when it redirected a
+  // wallet-less visitor here — show the Launch App guidance once (and
+  // pulse the header Connect button), so the visitor sees what to do
+  // instead of a bare landing page. If the visitor then connects, the
+  // guide effect above enters directly.
+  useEffect(() => {
+    try {
+      if (window.sessionStorage.getItem(LAUNCH_GUIDE_FLAG) === '1') {
+        window.sessionStorage.removeItem(LAUNCH_GUIDE_FLAG);
+        setLaunchState('guide');
+        onHighlightConnect?.(true);
+      }
+    } catch {
+      // Storage unavailable — no guidance, landing works as usual.
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Demo entry: no wallet required — the app opens with sample data and an
   // honest "Demo" badge. The demo video comes at the end of M4.
@@ -262,10 +257,9 @@ export default function Hero({
           <button
             type="button"
             onClick={handleLaunchApp}
-            disabled={launchState === 'signing'}
-            className="flex h-[52px] w-[170px] items-center justify-center rounded-btn bg-primary-gradient text-[16px] font-bold text-white shadow-sm transition-all duration-150 hover:brightness-110 active:scale-[0.98] disabled:opacity-70"
+            className="flex h-[52px] w-[170px] items-center justify-center rounded-btn bg-primary-gradient text-[16px] font-bold text-white shadow-sm transition-all duration-150 hover:brightness-110 active:scale-[0.98]"
           >
-            {launchState === 'signing' ? 'Signing in…' : 'Launch App'}
+            Launch App
           </button>
 
           <button
@@ -287,12 +281,6 @@ export default function Hero({
           See live proof — 4 transfers on Solana devnet
           <span aria-hidden="true">→</span>
         </a>
-
-        {launchError && (
-          <p role="alert" className="mt-3 max-w-[520px] text-[14px] leading-[20px] text-red-400">
-            {launchError}
-          </p>
-        )}
 
         {/* Launch App guidance: shown instead of silently opening the
             connect modal. The header Connect Wallet button pulses while
@@ -323,12 +311,14 @@ export default function Hero({
               </li>
               <li>
                 <span className="font-bold text-white">2.</span> Come back here and click{' '}
-                <span className="font-semibold text-white">Launch App</span> — you will sign
-                once to prove you own the wallet, then the app opens.
+                <span className="font-semibold text-white">Launch App</span> — the app opens
+                right away, no signature needed to enter.
               </li>
             </ol>
             <p className="mt-2 text-[13px] leading-[18px] text-textMuted">
-              No funds move — the signature only proves you own the wallet.
+              Some actions inside the app (publishing a route, loading live
+              history) ask you to sign once to prove you own the wallet. No
+              funds move when you sign.
             </p>
           </div>
         )}

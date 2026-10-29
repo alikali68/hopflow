@@ -7,6 +7,7 @@ import { WalletMultiButton } from '@solana/wallet-adapter-react-ui';
 import { signAndSend } from '@/lib/signing';
 import { verifyPreparedBundle } from '@/lib/txverify';
 import { signAuthMessage, authHeaders, type WalletAuth } from '@/lib/client-auth';
+import { setSessionAuth, saveSessionMarker } from '@/lib/session';
 import type { Transfer, PreparedTxs } from '@/lib/multihopper';
 import type { PublishJob } from '@/lib/publish-flow';
 import { CheckCircleIcon, ChevronRightIcon, AlertIcon, LockIcon } from '@/components/icons';
@@ -111,26 +112,30 @@ export default function ModulePublishFlow({
     setSteps(buildInitialSteps());
   }, [buildInitialSteps]);
 
-  // Wallet auth effect — sign the auth message once per wallet connection.
-  useEffect(() => {
-    if (!publicKey || !signMessage) {
-      setWalletAuth(null);
-      return;
-    }
+  // Wallet auth — R1 soft gate: signing happens ONLY when the user taps
+  // publish, never on mount. A successful sign also establishes the entry
+  // session (in memory + remembered marker) for F11 auto-redirect.
+  const [signing, setSigning] = useState<boolean>(false);
+  const signNow = useCallback(async (): Promise<WalletAuth | null> => {
+    if (!publicKey || !signMessage || authSigningRef.current) return walletAuth;
     const address = publicKey.toBase58();
-    if (walletAuth?.address === address) return;
-    if (authSigningRef.current) return;
-
+    if (walletAuth?.address === address) return walletAuth;
     authSigningRef.current = true;
+    setSigning(true);
     setAuthError(null);
-    signAuthMessage(address, signMessage)
-      .then((auth) => setWalletAuth(auth))
-      .catch((err) => {
-        setAuthError(err instanceof Error ? err.message : 'Auth signing failed');
-      })
-      .finally(() => {
-        authSigningRef.current = false;
-      });
+    try {
+      const auth = await signAuthMessage(address, signMessage);
+      setWalletAuth(auth);
+      setSessionAuth(auth);
+      saveSessionMarker(address);
+      return auth;
+    } catch (err) {
+      setAuthError(err instanceof Error ? err.message : 'Auth signing failed');
+      return null;
+    } finally {
+      authSigningRef.current = false;
+      setSigning(false);
+    }
   }, [publicKey, signMessage, walletAuth]);
 
   // Fetch live estimate on mount/job change
@@ -223,10 +228,11 @@ export default function ModulePublishFlow({
     return data;
   };
 
-  const runFlow = async (fromStepId?: string) => {
-    if (!walletAuth || !publicKey || !signTransaction) return;
+  const runFlow = async (fromStepId?: string, authOverride?: WalletAuth) => {
+    const auth = authOverride ?? walletAuth;
+    if (!auth || !publicKey || !signTransaction) return;
     setRunning(true);
-    const activeWallet = walletAuth.address;
+    const activeWallet = auth.address;
 
     try {
       const stepIndex = fromStepId ? steps.findIndex((s) => s.id === fromStepId) : 0;
@@ -257,7 +263,7 @@ export default function ModulePublishFlow({
 
         const res = await fetch('/api/multihopper/transfers', {
           method: 'POST',
-          headers: { ...authHeaders(walletAuth), 'Content-Type': 'application/json' },
+          headers: { ...authHeaders(auth), 'Content-Type': 'application/json' },
           body: JSON.stringify(createPayload),
         });
         const data = await res.json();
@@ -273,7 +279,7 @@ export default function ModulePublishFlow({
       if (stepIndex <= 1) {
         updateStep('prepare', { status: 'active', error: undefined });
         const id = transferIdRef.current!;
-        await reprepare(id, walletAuth);
+        await reprepare(id, auth);
         updateStep('prepare', { status: 'done', detail: 'Transactions verified & ready' });
       }
 
@@ -302,7 +308,7 @@ export default function ModulePublishFlow({
             // keeper signature with the fresh bundle (PublishPanel pattern).
             if (!isBlockhashError(err)) throw err;
             const id = transferIdRef.current!;
-            await reprepare(id, walletAuth);
+            await reprepare(id, auth);
             const fresh = preparedDataRef.current?.preparedTxs;
             if (!fresh?.keeperFundingTx) {
               throw new Error('keeperFundingTx missing after re-prepare');
@@ -322,7 +328,7 @@ export default function ModulePublishFlow({
         const id = transferIdRef.current!;
         const res = await fetch(`/api/multihopper/transfers/${encodeURIComponent(id)}/confirm-broadcast`, {
           method: 'POST',
-          headers: { ...authHeaders(walletAuth), 'Content-Type': 'application/json' },
+          headers: { ...authHeaders(auth), 'Content-Type': 'application/json' },
           body: JSON.stringify({
             keeperFundingSignature: keeperSigRef.current || undefined,
           }),
@@ -334,7 +340,7 @@ export default function ModulePublishFlow({
         updateStep('confirm-keeper', { status: 'done', detail: 'Keeper funding acknowledged' });
 
         // Fresh blockhash after keeper funding broadcast
-        await reprepare(id, walletAuth);
+        await reprepare(id, auth);
       }
 
       // 5. Sign + Broadcast Remaining Txs
@@ -383,7 +389,7 @@ export default function ModulePublishFlow({
         } catch (err) {
           if (!isBlockhashError(err)) throw err;
           const id = transferIdRef.current!;
-          await reprepare(id, walletAuth);
+          await reprepare(id, auth);
           const latest = preparedDataRef.current!.preparedTxs;
           applyRemaining(await signRemaining(latest));
         }
@@ -417,7 +423,7 @@ export default function ModulePublishFlow({
           } catch (err) {
             if (!isBlockhashError(err)) throw err;
             const id = transferIdRef.current!;
-            await reprepare(id, walletAuth);
+            await reprepare(id, auth);
             const latest = preparedDataRef.current!.preparedTxs;
             const dSigs = await signDispersion(latest);
             dispersionSigsRef.current = dSigs;
@@ -446,7 +452,7 @@ export default function ModulePublishFlow({
 
       let confirmRes = await fetch(`/api/multihopper/transfers/${encodeURIComponent(id)}/confirm-broadcast`, {
         method: 'POST',
-        headers: { ...authHeaders(walletAuth), 'Content-Type': 'application/json' },
+        headers: { ...authHeaders(auth), 'Content-Type': 'application/json' },
         body: JSON.stringify(confirmBody),
       });
 
@@ -454,7 +460,7 @@ export default function ModulePublishFlow({
 
       // Handle MH_041 retry once if dispersion txs pending
       if (!confirmRes.ok && confirmData.error?.code === 'MH_041') {
-        const fresh = await reprepare(id, walletAuth);
+        const fresh = await reprepare(id, auth);
         const dispTxs = (fresh.preparedTxs as unknown as { dispersionInitTxs?: Array<string | { base64: string }> }).dispersionInitTxs;
         if (dispTxs && dispTxs.length > 0) {
           const dSigs: string[] = [];
@@ -469,7 +475,7 @@ export default function ModulePublishFlow({
 
         confirmRes = await fetch(`/api/multihopper/transfers/${encodeURIComponent(id)}/confirm-broadcast`, {
           method: 'POST',
-          headers: { ...authHeaders(walletAuth), 'Content-Type': 'application/json' },
+          headers: { ...authHeaders(auth), 'Content-Type': 'application/json' },
           body: JSON.stringify(confirmBody),
         });
         confirmData = await confirmRes.json();
@@ -664,7 +670,7 @@ export default function ModulePublishFlow({
           {authError && (
             <div className="flex items-center gap-2 rounded-xl border border-[#F26D6D]/30 bg-[#F26D6D]/10 p-3 text-[13px] text-[#F26D6D]">
               <AlertIcon size={16} />
-              <span>Wallet auth failed — {authError} — reconnect the wallet to retry.</span>
+              <span>Wallet auth failed — {authError} — tap Publish again to retry signing.</span>
             </div>
           )}
 
@@ -685,11 +691,18 @@ export default function ModulePublishFlow({
           {/* Primary Action */}
           <button
             type="button"
-            onClick={() => runFlow()}
-            disabled={!walletAuth || Boolean(disabledReason) || estimateLoading || Boolean(estimateError)}
+            onClick={async () => {
+              if (walletAuth) {
+                void runFlow();
+                return;
+              }
+              const auth = await signNow();
+              if (auth) void runFlow(undefined, auth);
+            }}
+            disabled={signing || Boolean(disabledReason) || estimateLoading || Boolean(estimateError)}
             className="flex h-[56px] w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-[#9945FF] to-[#14F195] text-[15px] font-bold text-white shadow-[0_0_20px_rgba(20,241,149,0.3)] transition hover:brightness-110 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-40"
           >
-            <span>Sign & publish route</span>
+            <span>{signing ? 'Signing…' : 'Sign & publish route'}</span>
             <ChevronRightIcon size={18} />
           </button>
         </div>

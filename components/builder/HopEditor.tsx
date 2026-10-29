@@ -172,7 +172,7 @@ export default function HopEditor() {
             <button
               type="button"
               onClick={() => dispatch({ type: 'builder/saveDraft' })}
-              className="text-[13.5px] font-semibold text-[#9A9AB0] transition-colors hover:text-white"
+              className="inline-flex min-h-[44px] items-center text-[13.5px] font-semibold text-[#9A9AB0] transition-colors hover:text-white"
             >
               Save as draft
             </button>

@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { useRouter } from 'next/navigation';
-import { useStore } from '@/lib/store';
+import { useStore, clearSharedDemoFlag } from '@/lib/store';
 
 /**
  * Honest demo-mode badge. Shown on every app page (mounted in AppShell)
@@ -18,6 +18,9 @@ export default function DemoBadge() {
 
   const handleExitDemo = () => {
     dispatch({ type: 'session/setDemoMode', demoMode: false });
+    // Also clear the shared key's stale demo flag so a later manual
+    // AppShell URL does not pass the R2 gate back into the demo.
+    clearSharedDemoFlag();
     router.push('/');
   };
 
@@ -36,7 +39,7 @@ export default function DemoBadge() {
       <button
         type="button"
         onClick={handleExitDemo}
-        className="shrink-0 text-[12px] font-semibold text-[#14F195] transition-colors hover:text-white"
+        className="inline-flex min-h-[44px] shrink-0 items-center text-[12px] font-semibold text-[#14F195] transition-colors hover:text-white"
       >
         Exit demo →
       </button>

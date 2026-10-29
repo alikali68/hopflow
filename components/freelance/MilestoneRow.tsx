@@ -48,11 +48,13 @@ export default function MilestoneRow({
   };
 
   const ghostBtn =
-    'flex h-8 w-8 items-center justify-center rounded-lg text-[#9A9AB0] transition-colors hover:bg-white/5 hover:text-white disabled:opacity-30 disabled:hover:bg-transparent';
+    'flex h-11 w-11 items-center justify-center rounded-lg text-[#9A9AB0] transition-colors hover:bg-white/5 hover:text-white disabled:opacity-30 disabled:hover:bg-transparent';
 
   return (
     <div className="grad-border-soft rounded-xl p-4 transition hover:brightness-110">
-      <div className="flex items-center gap-3">
+      {/* Row 1 wraps below md: title stays on line 1, the amount drops to
+          its own line instead of being pushed past the card edge. */}
+      <div className="flex flex-wrap items-center gap-3">
         <GripIcon size={18} className="shrink-0 cursor-grab text-[#5C5C72]" />
         <div className="font-display flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-gradient-to-r from-[#9945FF] to-[#14F195] text-[13px] font-bold text-white shadow-[0_0_14px_rgba(153,69,255,0.5)]">
           {index + 1}
@@ -62,9 +64,9 @@ export default function MilestoneRow({
           value={milestone.title}
           onChange={(e) => onChange({ title: e.target.value })}
           placeholder="Milestone title"
-          className={`${FIELD} h-[42px] flex-1 px-4 text-[15px] font-semibold`}
+          className={`${FIELD} h-[42px] min-w-0 flex-1 basis-[120px] px-4 text-[15px] font-semibold`}
         />
-        <div className="relative w-[160px] shrink-0">
+        <div className="relative w-[160px] shrink-0 max-md:w-auto max-md:min-w-[100px] max-md:flex-1">
           <span className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 font-display text-[14px] font-bold text-white/85">
             {token === 'USDC' ? '$' : '◎'}
           </span>
@@ -83,8 +85,11 @@ export default function MilestoneRow({
         </div>
       </div>
 
-      <div className="mt-3 flex items-center gap-3 pl-10 sm:pl-[70px]">
-        <div className="relative w-[110px] shrink-0">
+      {/* Row 2 wraps below md: % + date share a line where they fit, the
+          date drops below on the narrowest phones; actions stay on their
+          own right-aligned line. Never fixed with horizontal scrolling. */}
+      <div className="mt-3 flex flex-wrap items-center gap-3 pl-10 max-md:pl-0 sm:pl-[70px]">
+        <div className="relative w-[110px] shrink-0 max-md:w-[72px]">
           <input
             type="text"
             value={currentPct}
@@ -103,7 +108,7 @@ export default function MilestoneRow({
           minDate={new Date()}
           placeholder="Due date"
           ariaLabel="Milestone due date"
-          className="w-[180px] shrink-0"
+          className="w-[180px] shrink-0 max-md:w-auto max-md:min-w-[130px] max-md:flex-1"
         />
 
         <div className="flex-1" />
@@ -122,7 +127,7 @@ export default function MilestoneRow({
           onClick={onRemove}
           disabled={!canRemove}
           aria-label="Delete milestone"
-          className="flex h-8 w-8 items-center justify-center rounded-lg text-[#9A9AB0] transition-colors hover:bg-white/5 hover:text-[#F26D6D] disabled:opacity-30"
+          className="flex h-11 w-11 items-center justify-center rounded-lg text-[#9A9AB0] transition-colors hover:bg-white/5 hover:text-[#F26D6D] disabled:opacity-30"
         >
           <TrashIcon size={17} />
         </button>

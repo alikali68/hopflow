@@ -205,7 +205,7 @@ export default function PlanBeneficiariesCard({ plan }: PlanBeneficiariesCardPro
                   {/* Wallet Row */}
                   <div className="mt-3 flex flex-wrap items-center gap-3 border-t border-white/[0.06] pt-3">
                     <span className="min-w-0 flex-1 break-all font-mono text-[13px] text-[#B8B8C7]">
-                      {member.wallet}
+                      {shortWallet(member.wallet)}
                     </span>
 
                     <button
@@ -214,7 +214,7 @@ export default function PlanBeneficiariesCard({ plan }: PlanBeneficiariesCardPro
                         e.stopPropagation();
                         handleCopy(member.id, member.wallet);
                       }}
-                      className="flex h-[34px] shrink-0 items-center rounded-lg border border-white/10 px-3 text-[12px] font-semibold text-white transition-colors hover:border-[#9945FF]"
+                      className="flex h-11 shrink-0 items-center rounded-lg border border-white/10 px-3 text-[12px] font-semibold text-white transition-colors hover:border-[#9945FF]"
                     >
                       {copiedId === member.id
                         ? 'Copied ✓'

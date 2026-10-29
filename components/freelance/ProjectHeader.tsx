@@ -35,7 +35,7 @@ export default function ProjectHeader({ project }: { project: FreelanceProject }
       <div className="flex items-center justify-between gap-3">
         <a
           href="/freelance"
-          className="inline-flex items-center gap-1.5 text-[13px] font-medium text-[#9A9AB0] transition-colors hover:text-white"
+          className="inline-flex min-h-[44px] items-center gap-1.5 text-[13px] font-medium text-[#9A9AB0] transition-colors hover:text-white"
         >
           <ArrowLeftIcon size={15} />
           <span>Back to projects</span>
@@ -43,7 +43,7 @@ export default function ProjectHeader({ project }: { project: FreelanceProject }
         {project.role === 'client' && project.status !== 'Cancelled' && (
           <a
             href={`/freelance/${project.id}/end`}
-            className="inline-flex items-center gap-1 text-[13px] font-medium text-[#F26D6D]/80 transition-colors hover:text-[#F26D6D]"
+            className="inline-flex min-h-[44px] items-center gap-1 text-[13px] font-medium text-[#F26D6D]/80 transition-colors hover:text-[#F26D6D]"
           >
             <span>End project</span>
             <ArrowUpRightIcon size={14} />

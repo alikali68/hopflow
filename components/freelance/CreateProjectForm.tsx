@@ -176,7 +176,7 @@ export default function CreateProjectForm() {
           <button
             type="button"
             onClick={() => dispatch({ type: 'freelance/saveDraft' })}
-            className="mx-auto mt-3 block text-[13px] font-medium text-[#9A9AB0] transition-colors hover:text-white"
+            className="mx-auto mt-3 flex min-h-[44px] items-center text-[13px] font-medium text-[#9A9AB0] transition-colors hover:text-white"
           >
             {draftSaved && draft.draftSavedAt
               ? `Draft saved ${formatShortDateTz(new Date(draft.draftSavedAt))}`

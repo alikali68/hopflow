@@ -6,8 +6,11 @@ interface WizardStepsProps {
 }
 
 export default function WizardSteps({ steps, current }: WizardStepsProps) {
+  // F9: the pill row scrolls horizontally below the width it needs
+  // (instead of clipping at the edge) with end padding so the last
+  // pill never touches the viewport edge when scrolled fully right.
   return (
-    <nav className="flex w-full items-center" aria-label="Wizard steps">
+    <nav className="flex w-full items-center overflow-x-auto pr-6" aria-label="Wizard steps">
       {steps.map((label, index) => {
         const stepNumber = index + 1;
         const isCurrent = stepNumber === current;

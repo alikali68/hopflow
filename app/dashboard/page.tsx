@@ -178,7 +178,7 @@ export default function DashboardPage() {
                 <span className="text-[12px] font-medium text-[#9A9AB0]">Sample data</span>
               )}
             </div>
-            <a href="/routes" className="text-[13px] font-medium text-[#14F195] transition-colors hover:underline">
+            <a href="/routes" className="inline-flex min-h-[44px] items-center text-[13px] font-medium text-[#14F195] transition-colors hover:underline">
               View all →
             </a>
           </div>
