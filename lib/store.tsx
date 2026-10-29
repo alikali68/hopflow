@@ -1355,6 +1355,7 @@ const StoreContext = createContext<{
    * demo mode (and for logged-out visitors), or the connected wallet's
    * own per-wallet key in real mode. */
   storeKey: string;
+  storeReady: boolean;
 } | null>(null);
 
 export function StoreProvider({ children }: { children: React.ReactNode }) {
