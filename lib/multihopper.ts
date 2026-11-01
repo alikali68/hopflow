@@ -85,6 +85,24 @@ export interface Transfer {
   [key: string]: unknown;
 }
 
+// Per-wallet visibility: a transfer is visible to a wallet only when that
+// wallet is involved in it — as the source, the single recipient, or one of
+// the multi-destination recipients. The list/detail proxy routes enforce
+// this so an authenticated wallet can never enumerate other wallets'
+// transfers (list) or pull one by id (detail).
+export function transferInvolvesWallet(
+  transfer: Transfer,
+  address: string
+): boolean {
+  if (transfer.sourceOwner === address) return true;
+  if (transfer.recipientWallet === address) return true;
+  const destinations = transfer.destinations;
+  if (Array.isArray(destinations)) {
+    return destinations.some((d) => d.wallet === address);
+  }
+  return false;
+}
+
 export function getApiKey(): string {
   const key = process.env.MULTIHOPPER_API_KEY;
   if (!key) {

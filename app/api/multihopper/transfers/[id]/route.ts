@@ -1,7 +1,7 @@
 // app/api/multihopper/transfers/[id]/route.ts
 import { NextRequest, NextResponse } from 'next/server';
-import { getTransfer } from '@/lib/multihopper';
-import { guardRoute } from '@/lib/api-guard';
+import { getTransfer, transferInvolvesWallet } from '@/lib/multihopper';
+import { guardRoute, unauthorizedResponse, verifyWalletAuth } from '@/lib/api-guard';
 
 export async function GET(
   req: NextRequest,
@@ -12,6 +12,22 @@ export async function GET(
     if (guard) return guard;
     const { id } = await params;
     const transfer = await getTransfer(id);
+    // Per-wallet visibility (same rule as the list route): without this,
+    // the list filter could be bypassed by fetching a transfer by id.
+    // Recipients and destinations may read it; strangers get 403.
+    const auth = verifyWalletAuth(req);
+    if (!auth) return unauthorizedResponse();
+    if (!transferInvolvesWallet(transfer, auth.address)) {
+      return NextResponse.json(
+        {
+          error: {
+            code: 'FORBIDDEN',
+            message: 'Transfer is not associated with the authenticated wallet.',
+          },
+        },
+        { status: 403 }
+      );
+    }
     return NextResponse.json(transfer);
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Unknown error';

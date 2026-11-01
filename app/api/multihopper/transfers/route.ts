@@ -1,7 +1,7 @@
 // app/api/multihopper/transfers/route.ts
 import { NextRequest, NextResponse } from 'next/server';
-import { createTransfer, listTransfers, CreateTransferInput } from '@/lib/multihopper';
-import { guardRoute, readJsonBody, verifyWalletAuth } from '@/lib/api-guard';
+import { createTransfer, listTransfers, transferInvolvesWallet, CreateTransferInput } from '@/lib/multihopper';
+import { guardRoute, readJsonBody, unauthorizedResponse, verifyWalletAuth } from '@/lib/api-guard';
 import { validateCreateInput } from '@/lib/validate';
 
 export async function POST(req: NextRequest) {
@@ -70,7 +70,14 @@ export async function GET(req: NextRequest) {
       : undefined;
 
     const transfers = await listTransfers({ status, limit });
-    return NextResponse.json(transfers);
+    // Per-wallet visibility: the authenticated wallet sees only transfers
+    // it is involved in (source, recipient, or destination). Without this
+    // filter any authenticated wallet could enumerate every wallet's list.
+    const auth = verifyWalletAuth(req);
+    if (!auth) return unauthorizedResponse();
+    return NextResponse.json(
+      transfers.filter((t) => transferInvolvesWallet(t, auth.address))
+    );
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Unknown error';
     const match = message.match(/^(MH_\w+):\s*(.*)$/);
